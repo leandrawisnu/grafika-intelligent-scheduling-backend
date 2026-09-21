@@ -1,0 +1,32 @@
+# Postgres lokal dev (host DB untuk backend, pola KAI BIOP).
+# Jalankan: docker compose -f docker-compose.db.yaml up -d
+
+version: "3.5"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: grafika-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-grafika}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-grafika_dev}
+      POSTGRES_DB: ${DB_NAME:-grafika}
+    ports:
+      - "127.0.0.1:${DB_PORT:-5433}:5432"
+    volumes:
+      - grafika_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-grafika} -d ${DB_NAME:-grafika}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "200k"
+        max-file: "10"
+        mode: non-blocking
+
+volumes:
+  grafika_pgdata:

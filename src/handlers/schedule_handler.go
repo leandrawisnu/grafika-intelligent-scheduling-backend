@@ -6,9 +6,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/grafika-scheduling/backend/internal/dto"
-	"github.com/grafika-scheduling/backend/internal/models"
-	"github.com/grafika-scheduling/backend/internal/services"
+	"github.com/grafika-scheduling/backend/src/dto"
+	"github.com/grafika-scheduling/backend/src/models"
+	"github.com/grafika-scheduling/backend/src/services"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
 	"gorm.io/gorm"
 )
@@ -406,16 +406,11 @@ func (h *PengelolaJadwal) PrediksiKonflik(c *fiber.Ctx) error {
 		h.db.Model(&models.HariLiburGuru{}).Select("h.nama").
 			Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
 			Where("guru_id = ?", g.ID).Pluck("h.nama", &hariLibur)
-		var mapel []string
-		h.db.Model(&models.KualifikasiGuru{}).Select("mp.nama").
-			Joins("JOIN mata_pelajaran mp ON mp.id = kualifikasi_guru.mata_pelajaran_id").
-			Where("guru_id = ?", g.ID).Pluck("mp.nama", &mapel)
 		guruML[i] = dto.GuruUntukML{
-			ID:              g.ID.String(),
-			Nama:            g.NamaLengkap,
+			ID:               g.ID.String(),
+			Nama:             g.NamaLengkap,
 			JamMaksPerMinggu: g.JamMaksimalPerMinggu,
-			HariLibur:       hariLibur,
-			MataPelajaran:   mapel,
+			HariLibur:        hariLibur,
 		}
 	}
 

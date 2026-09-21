@@ -3,7 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"github.com/grafika-scheduling/backend/internal/models"
+	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/gorm"
 )
 
@@ -44,9 +44,6 @@ func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
 	r.Get("/guru/:id/hari-libur", h.DaftarHariLiburGuru)
 	r.Post("/guru/:id/hari-libur", h.BuatHariLiburGuru)
 	r.Delete("/guru/:id/hari-libur/:liburId", h.HapusHariLiburGuru)
-	r.Get("/guru/:id/kualifikasi", h.DaftarKualifikasiGuru)
-	r.Post("/guru/:id/kualifikasi", h.BuatKualifikasiGuru)
-	r.Delete("/guru/:id/kualifikasi/:kualId", h.HapusKualifikasiGuru)
 
 	r.Get("/mata-pelajaran", h.DaftarMataPelajaran)
 	r.Post("/mata-pelajaran", h.BuatMataPelajaran)
@@ -277,30 +274,6 @@ func (h *PengelolaMaster) BuatHariLiburGuru(c *fiber.Ctx) error {
 
 func (h *PengelolaMaster) HapusHariLiburGuru(c *fiber.Ctx) error {
 	h.db.Delete(&models.HariLiburGuru{}, "id = ?", c.Params("liburId"))
-	return c.JSON(fiber.Map{"status": "dihapus"})
-}
-
-// Kualifikasi Guru
-func (h *PengelolaMaster) DaftarKualifikasiGuru(c *fiber.Ctx) error {
-	id, _ := uuid.Parse(c.Params("id"))
-	var items []models.KualifikasiGuru
-	h.db.Where("guru_id = ?", id).Preload("MataPelajaran").Find(&items)
-	return c.JSON(items)
-}
-
-func (h *PengelolaMaster) BuatKualifikasiGuru(c *fiber.Ctx) error {
-	id, _ := uuid.Parse(c.Params("id"))
-	var item models.KualifikasiGuru
-	if err := c.BodyParser(&item); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
-	}
-	item.GuruID = id
-	h.db.Create(&item)
-	return c.Status(201).JSON(item)
-}
-
-func (h *PengelolaMaster) HapusKualifikasiGuru(c *fiber.Ctx) error {
-	h.db.Delete(&models.KualifikasiGuru{}, "id = ?", c.Params("kualId"))
 	return c.JSON(fiber.Map{"status": "dihapus"})
 }
 

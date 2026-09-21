@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/grafika-scheduling/backend/internal/models"
+	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/gorm"
 )
 
@@ -35,7 +35,6 @@ func (s *LayananKonflik) DeteksiKonflik(jsID uuid.UUID) ([]models.Konflik, error
 	konflik = append(konflik, s.cekKelasBentrok(jsID, slots)...)
 	konflik = append(konflik, s.cekGuruKelebihanJam(jsID, slots)...)
 	konflik = append(konflik, s.cekGuruHariLibur(jsID, slots)...)
-	konflik = append(konflik, s.cekGuruTidakBerkualifikasi(jsID, slots)...)
 
 	// Hapus konflik lama dan simpan yang baru
 	s.db.Where("jadwal_semester_id = ?", jsID).Delete(&models.Konflik{})
@@ -232,40 +231,6 @@ func (s *LayananKonflik) cekGuruHariLibur(jsID uuid.UUID, slots []models.SlotJad
 				SlotAID:          &slot.ID,
 				GuruID:           &slot.GuruID,
 				Deskripsi:        fmt.Sprintf("Guru %s dijadwalkan pada hari %s yang merupakan hari liburnya", namaGuru, namaHari),
-				TerdeteksiPada:   time.Now(),
-			})
-		}
-	}
-	return konflik
-}
-
-func (s *LayananKonflik) cekGuruTidakBerkualifikasi(jsID uuid.UUID, slots []models.SlotJadwal) []models.Konflik {
-	var konflik []models.Konflik
-
-	for _, slot := range slots {
-		if slot.GuruID == uuid.Nil {
-			continue
-		}
-		var count int64
-		s.db.Model(&models.KualifikasiGuru{}).
-			Where("guru_id = ? AND mata_pelajaran_id = ?", slot.GuruID, slot.MataPelajaranID).
-			Count(&count)
-		if count == 0 {
-			namaGuru := "Tidak Diketahui"
-			namaMapel := "Tidak Diketahui"
-			if slot.Guru != nil {
-				namaGuru = slot.Guru.NamaLengkap
-			}
-			if slot.MataPelajaran != nil {
-				namaMapel = slot.MataPelajaran.Nama
-			}
-			konflik = append(konflik, models.Konflik{
-				JadwalSemesterID: jsID,
-				TipeKonflik:      "guru_tidak_berkualifikasi",
-				TingkatKeparahan: "peringatan",
-				SlotAID:          &slot.ID,
-				GuruID:           &slot.GuruID,
-				Deskripsi:        fmt.Sprintf("Guru %s tidak memiliki kualifikasi untuk mengajar %s", namaGuru, namaMapel),
 				TerdeteksiPada:   time.Now(),
 			})
 		}

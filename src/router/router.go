@@ -4,7 +4,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
-	"github.com/grafika-scheduling/backend/internal/handlers"
+	"github.com/grafika-scheduling/backend/src/handlers"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
 	"gorm.io/gorm"
 )

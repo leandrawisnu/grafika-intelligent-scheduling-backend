@@ -3,7 +3,7 @@ package database
 import (
 	"log"
 
-	"github.com/grafika-scheduling/backend/internal/models"
+	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -16,8 +16,11 @@ func Connect(dsn string) *gorm.DB {
 	if err != nil {
 		log.Fatalf("Gagal terhubung ke database: %v", err)
 	}
+	return db
+}
 
-	if err := db.AutoMigrate(
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(
 		&models.TahunAjaran{},
 		&models.Semester{},
 		&models.Jurusan{},
@@ -28,7 +31,6 @@ func Connect(dsn string) *gorm.DB {
 		&models.Hari{},
 		&models.JamPelajaran{},
 		&models.HariLiburGuru{},
-		&models.KualifikasiGuru{},
 		&models.JadwalSemester{},
 		&models.JadwalSemesterJurusan{},
 		&models.JadwalKelas{},
@@ -36,9 +38,9 @@ func Connect(dsn string) *gorm.DB {
 		&models.Konflik{},
 		&models.ResolusiAI{},
 		&models.LogAuditJadwal{},
-	); err != nil {
-		log.Fatalf("Gagal auto-migrate: %v", err)
-	}
-
-	return db
+		&models.SesiChatAI{},
+		&models.PesanChatAI{},
+		&models.FeedbackChatAI{},
+		&models.MemoriChatbot{},
+	)
 }

@@ -133,17 +133,6 @@ type HariLiburGuru struct {
 
 func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
 
-type KualifikasiGuru struct {
-	BaseModel
-	GuruID          uuid.UUID `gorm:"not null;type:uuid;column:guru_id" json:"guru_id"`
-	Guru            *Guru
-	MataPelajaranID uuid.UUID `gorm:"not null;type:uuid;column:mata_pelajaran_id" json:"mata_pelajaran_id"`
-	MataPelajaran   *MataPelajaran
-	TingkatKeahlian string    `gorm:"default:berkualifikasi;column:tingkat_keahlian;size:20" json:"tingkat_keahlian"`
-}
-
-func (KualifikasiGuru) TableName() string { return "kualifikasi_guru" }
-
 // ---- JADWAL BARU ----
 
 // Master jadwal per semester
@@ -261,3 +250,72 @@ type LogAuditJadwal struct {
 }
 
 func (LogAuditJadwal) TableName() string { return "log_audit_jadwal" }
+
+// ---- AI Chat (Tanya AI) ----
+
+type SesiChatAI struct {
+	BaseModel
+	JadwalSemesterID *uuid.UUID `gorm:"type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemester   *JadwalSemester
+	DilakukanOleh    string        `gorm:"not null;default:anonim;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	Judul            *string       `gorm:"column:judul;size:200" json:"judul"`
+	Pesan            []PesanChatAI `gorm:"foreignKey:SesiChatID" json:"pesan,omitempty"`
+}
+
+func (SesiChatAI) TableName() string { return "sesi_chat_ai" }
+
+type PesanChatAI struct {
+	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	SesiChatID   uuid.UUID `gorm:"not null;type:uuid;column:sesi_chat_id" json:"sesi_chat_id"`
+	SesiChat     *SesiChatAI
+	Peran        string    `gorm:"not null;column:peran;size:20" json:"peran"`
+	Isi          string    `gorm:"not null;type:text;column:isi" json:"isi"`
+	MetadataJSON *string   `gorm:"type:jsonb;column:metadata_json" json:"metadata_json,omitempty"`
+	DibuatPada   time.Time `gorm:"autoCreateTime;column:dibuat_pada" json:"dibuat_pada"`
+}
+
+func (PesanChatAI) TableName() string { return "pesan_chat_ai" }
+
+func (p *PesanChatAI) BeforeCreate(tx *gorm.DB) error {
+	if p.ID == uuid.Nil {
+		p.ID = uuid.New()
+	}
+	return nil
+}
+
+type FeedbackChatAI struct {
+	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	SesiChatID    uuid.UUID  `gorm:"not null;type:uuid;column:sesi_chat_id" json:"sesi_chat_id"`
+	SesiChat      *SesiChatAI
+	PesanChatID   *uuid.UUID `gorm:"type:uuid;column:pesan_chat_id" json:"pesan_chat_id"`
+	PesanChat     *PesanChatAI
+	Nilai         *int16     `gorm:"column:nilai" json:"nilai"`
+	Jenis         string     `gorm:"not null;column:jenis;size:30" json:"jenis"`
+	Komentar      *string    `gorm:"type:text;column:komentar" json:"komentar"`
+	DilakukanOleh string     `gorm:"not null;default:anonim;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	DibuatPada    time.Time  `gorm:"autoCreateTime;column:dibuat_pada" json:"dibuat_pada"`
+}
+
+func (FeedbackChatAI) TableName() string { return "feedback_chat_ai" }
+
+func (f *FeedbackChatAI) BeforeCreate(tx *gorm.DB) error {
+	if f.ID == uuid.Nil {
+		f.ID = uuid.New()
+	}
+	return nil
+}
+
+type MemoriChatbot struct {
+	BaseModel
+	DilakukanOleh     string     `gorm:"not null;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	JadwalSemesterID  *uuid.UUID `gorm:"type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemester    *JadwalSemester
+	Kunci             string     `gorm:"not null;default:umum;column:kunci;size:100" json:"kunci"`
+	Ringkasan         string     `gorm:"not null;type:text;column:ringkasan" json:"ringkasan"`
+	FaktaJSON         *string    `gorm:"type:jsonb;column:fakta_json" json:"fakta_json,omitempty"`
+	SumberSesiChatID  *uuid.UUID `gorm:"type:uuid;column:sumber_sesi_chat_id" json:"sumber_sesi_chat_id"`
+	SumberSesiChat    *SesiChatAI
+	Aktif             bool       `gorm:"default:true;column:aktif" json:"aktif"`
+}
+
+func (MemoriChatbot) TableName() string { return "memori_chatbot" }

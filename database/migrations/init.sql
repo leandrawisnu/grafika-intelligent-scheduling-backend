@@ -6,7 +6,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE TABLE tahun_ajaran (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nama              VARCHAR(50) NOT NULL UNIQUE,
+    nama              VARCHAR(50) NOT NULL CONSTRAINT uni_tahun_ajaran_nama UNIQUE,
     tanggal_mulai     DATE NOT NULL,
     tanggal_selesai   DATE NOT NULL,
     aktif             BOOLEAN DEFAULT true,
@@ -29,7 +29,7 @@ CREATE TABLE semester (
 
 CREATE TABLE jurusan (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(20) NOT NULL UNIQUE,
+    kode            VARCHAR(20) NOT NULL CONSTRAINT uni_jurusan_kode UNIQUE,
     nama            VARCHAR(100) NOT NULL,
     dibuat_pada     TIMESTAMPTZ DEFAULT now(),
     diperbarui_pada TIMESTAMPTZ DEFAULT now()
@@ -37,7 +37,7 @@ CREATE TABLE jurusan (
 
 CREATE TABLE guru (
     id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nip                  VARCHAR(30) NOT NULL UNIQUE,
+    nip                  VARCHAR(30) NOT NULL CONSTRAINT uni_guru_nip UNIQUE,
     nama_lengkap         VARCHAR(150) NOT NULL,
     jam_maksimal_per_minggu  DECIMAL(4,1) NOT NULL DEFAULT 40.0,
     aktif                BOOLEAN DEFAULT true,
@@ -47,7 +47,7 @@ CREATE TABLE guru (
 
 CREATE TABLE mata_pelajaran (
     id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode                   VARCHAR(20) NOT NULL UNIQUE,
+    kode                   VARCHAR(20) NOT NULL CONSTRAINT uni_mata_pelajaran_kode UNIQUE,
     nama                   VARCHAR(150) NOT NULL,
     jam_wajib_per_minggu   DECIMAL(4,1) NOT NULL,
     tingkat                SMALLINT NOT NULL,
@@ -57,7 +57,7 @@ CREATE TABLE mata_pelajaran (
 
 CREATE TABLE kelas (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(30) NOT NULL UNIQUE,
+    kode            VARCHAR(30) NOT NULL CONSTRAINT uni_kelas_kode UNIQUE,
     nama            VARCHAR(100) NOT NULL,
     tingkat         SMALLINT NOT NULL,
     jurusan_id      UUID REFERENCES jurusan(id),
@@ -68,7 +68,7 @@ CREATE TABLE kelas (
 
 CREATE TABLE ruangan (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(20) NOT NULL UNIQUE,
+    kode            VARCHAR(20) NOT NULL CONSTRAINT uni_ruangan_kode UNIQUE,
     nama            VARCHAR(100) NOT NULL,
     kapasitas       INT NOT NULL DEFAULT 30,
     tipe_ruangan    VARCHAR(30) DEFAULT 'kelas',
@@ -79,8 +79,8 @@ CREATE TABLE ruangan (
 
 CREATE TABLE hari (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    nama         VARCHAR(20) NOT NULL UNIQUE,
-    urutan_hari  SMALLINT NOT NULL UNIQUE,
+    nama         VARCHAR(20) NOT NULL CONSTRAINT uni_hari_nama UNIQUE,
+    urutan_hari  SMALLINT NOT NULL CONSTRAINT uni_hari_urutan_hari UNIQUE,
     akhir_pekan  BOOLEAN DEFAULT false,
     dibuat_pada  TIMESTAMPTZ DEFAULT now()
 );
@@ -96,7 +96,7 @@ INSERT INTO hari (nama, urutan_hari, akhir_pekan) VALUES
 
 CREATE TABLE jam_pelajaran (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    jam_ke        SMALLINT NOT NULL UNIQUE,
+    jam_ke        SMALLINT NOT NULL CONSTRAINT uni_jam_pelajaran_jam_ke UNIQUE,
     waktu_mulai   TIME NOT NULL,
     waktu_selesai TIME NOT NULL,
     istirahat     BOOLEAN DEFAULT false,
@@ -115,15 +115,6 @@ CREATE TABLE hari_libur_guru (
     alasan        VARCHAR(255),
     dibuat_pada   TIMESTAMPTZ DEFAULT now(),
     UNIQUE(guru_id, hari_id, semester_id)
-);
-
-CREATE TABLE kualifikasi_guru (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    guru_id           UUID NOT NULL REFERENCES guru(id) ON DELETE CASCADE,
-    mata_pelajaran_id UUID NOT NULL REFERENCES mata_pelajaran(id) ON DELETE CASCADE,
-    tingkat_keahlian  VARCHAR(20) DEFAULT 'berkualifikasi',
-    dibuat_pada       TIMESTAMPTZ DEFAULT now(),
-    UNIQUE(guru_id, mata_pelajaran_id)
 );
 
 -- ============================================
@@ -193,7 +184,6 @@ CREATE TYPE tipe_konflik AS ENUM (
     'guru_kelebihan_jam',
     'guru_hari_libur',
     'jam_mapel_kurang',
-    'guru_tidak_berkualifikasi',
     'kapasitas_ruangan_melebihi'
 );
 
@@ -248,3 +238,67 @@ CREATE TABLE log_audit_jadwal (
     dilakukan_oleh      VARCHAR(100) DEFAULT 'sistem',
     dibuat_pada         TIMESTAMPTZ DEFAULT now()
 );
+
+-- ============================================
+-- AI — TANYA JADWAL (CHATBOT)
+-- ============================================
+
+-- Satu thread percakapan (Tanya AI) per pengguna / konteks jadwal
+CREATE TABLE sesi_chat_ai (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    jadwal_semester_id  UUID REFERENCES jadwal_semester(id) ON DELETE SET NULL,
+    dilakukan_oleh      VARCHAR(100) NOT NULL DEFAULT 'anonim',
+    judul               VARCHAR(200),
+    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
+    diperbarui_pada     TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_sesi_chat_jadwal ON sesi_chat_ai(jadwal_semester_id);
+CREATE INDEX idx_sesi_chat_pengguna ON sesi_chat_ai(dilakukan_oleh, dibuat_pada DESC);
+
+-- Riwayat pesan dalam sesi (pertanyaan + jawaban asisten)
+CREATE TABLE pesan_chat_ai (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sesi_chat_id    UUID NOT NULL REFERENCES sesi_chat_ai(id) ON DELETE CASCADE,
+    peran           VARCHAR(20) NOT NULL,
+    isi             TEXT NOT NULL,
+    metadata_json   JSONB,
+    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
+    CHECK (peran IN ('pengguna', 'asisten', 'sistem'))
+);
+
+CREATE INDEX idx_pesan_chat_sesi ON pesan_chat_ai(sesi_chat_id, dibuat_pada);
+
+-- Feedback pengguna atas jawaban / sesi chatbot
+CREATE TABLE feedback_chat_ai (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    sesi_chat_id    UUID NOT NULL REFERENCES sesi_chat_ai(id) ON DELETE CASCADE,
+    pesan_chat_id   UUID REFERENCES pesan_chat_ai(id) ON DELETE SET NULL,
+    nilai           SMALLINT,
+    jenis           VARCHAR(30) NOT NULL,
+    komentar        TEXT,
+    dilakukan_oleh  VARCHAR(100) NOT NULL DEFAULT 'anonim',
+    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
+    CHECK (nilai IS NULL OR (nilai >= 1 AND nilai <= 5)),
+    CHECK (jenis IN ('positif', 'negatif', 'saran', 'laporkan'))
+);
+
+CREATE INDEX idx_feedback_chat_sesi ON feedback_chat_ai(sesi_chat_id);
+CREATE INDEX idx_feedback_chat_pesan ON feedback_chat_ai(pesan_chat_id);
+
+-- Memori jangka panjang chatbot (preferensi, ringkasan fakta untuk konteks berikutnya)
+CREATE TABLE memori_chatbot (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    dilakukan_oleh      VARCHAR(100) NOT NULL,
+    jadwal_semester_id  UUID REFERENCES jadwal_semester(id) ON DELETE CASCADE,
+    kunci               VARCHAR(100) NOT NULL DEFAULT 'umum',
+    ringkasan           TEXT NOT NULL,
+    fakta_json          JSONB,
+    sumber_sesi_chat_id UUID REFERENCES sesi_chat_ai(id) ON DELETE SET NULL,
+    aktif               BOOLEAN DEFAULT true,
+    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
+    diperbarui_pada     TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX idx_memori_chatbot_pengguna ON memori_chatbot(dilakukan_oleh, aktif);
+CREATE INDEX idx_memori_chatbot_jadwal ON memori_chatbot(jadwal_semester_id) WHERE jadwal_semester_id IS NOT NULL;

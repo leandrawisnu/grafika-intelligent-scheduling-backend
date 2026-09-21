@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/grafika-scheduling/backend/internal/models"
+	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/gorm"
 )
 
