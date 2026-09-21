@@ -10,8 +10,8 @@ CREATE TABLE tahun_ajaran (
     tanggal_mulai     DATE NOT NULL,
     tanggal_selesai   DATE NOT NULL,
     aktif             BOOLEAN DEFAULT true,
-    dibuat_pada       TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada   TIMESTAMPTZ DEFAULT now()
+    created_at       TIMESTAMPTZ DEFAULT now(),
+    updated_at   TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE semester (
@@ -22,8 +22,8 @@ CREATE TABLE semester (
     tanggal_mulai     DATE NOT NULL,
     tanggal_selesai   DATE NOT NULL,
     aktif             BOOLEAN DEFAULT true,
-    dibuat_pada       TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada   TIMESTAMPTZ DEFAULT now(),
+    created_at       TIMESTAMPTZ DEFAULT now(),
+    updated_at   TIMESTAMPTZ DEFAULT now(),
     UNIQUE(tahun_ajaran_id, semester_ke)
 );
 
@@ -31,8 +31,8 @@ CREATE TABLE jurusan (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     kode            VARCHAR(20) NOT NULL CONSTRAINT uni_jurusan_kode UNIQUE,
     nama            VARCHAR(100) NOT NULL,
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada TIMESTAMPTZ DEFAULT now()
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE guru (
@@ -41,8 +41,8 @@ CREATE TABLE guru (
     nama_lengkap         VARCHAR(150) NOT NULL,
     jam_maksimal_per_minggu  DECIMAL(4,1) NOT NULL DEFAULT 40.0,
     aktif                BOOLEAN DEFAULT true,
-    dibuat_pada          TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada      TIMESTAMPTZ DEFAULT now()
+    created_at          TIMESTAMPTZ DEFAULT now(),
+    updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE mata_pelajaran (
@@ -51,8 +51,8 @@ CREATE TABLE mata_pelajaran (
     nama                   VARCHAR(150) NOT NULL,
     jam_wajib_per_minggu   DECIMAL(4,1) NOT NULL,
     tingkat                SMALLINT NOT NULL,
-    dibuat_pada            TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada        TIMESTAMPTZ DEFAULT now()
+    created_at            TIMESTAMPTZ DEFAULT now(),
+    updated_at        TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE kelas (
@@ -62,8 +62,8 @@ CREATE TABLE kelas (
     tingkat         SMALLINT NOT NULL,
     jurusan_id      UUID REFERENCES jurusan(id),
     semester_id     UUID NOT NULL REFERENCES semester(id),
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada TIMESTAMPTZ DEFAULT now()
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE ruangan (
@@ -73,8 +73,8 @@ CREATE TABLE ruangan (
     kapasitas       INT NOT NULL DEFAULT 30,
     tipe_ruangan    VARCHAR(30) DEFAULT 'kelas',
     aktif           BOOLEAN DEFAULT true,
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada TIMESTAMPTZ DEFAULT now()
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE hari (
@@ -82,7 +82,8 @@ CREATE TABLE hari (
     nama         VARCHAR(20) NOT NULL CONSTRAINT uni_hari_nama UNIQUE,
     urutan_hari  SMALLINT NOT NULL CONSTRAINT uni_hari_urutan_hari UNIQUE,
     akhir_pekan  BOOLEAN DEFAULT false,
-    dibuat_pada  TIMESTAMPTZ DEFAULT now()
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 INSERT INTO hari (nama, urutan_hari, akhir_pekan) VALUES
@@ -100,7 +101,8 @@ CREATE TABLE jam_pelajaran (
     waktu_mulai   TIME NOT NULL,
     waktu_selesai TIME NOT NULL,
     istirahat     BOOLEAN DEFAULT false,
-    dibuat_pada   TIMESTAMPTZ DEFAULT now()
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ============================================
@@ -113,7 +115,8 @@ CREATE TABLE hari_libur_guru (
     hari_id       UUID NOT NULL REFERENCES hari(id) ON DELETE CASCADE,
     semester_id   UUID NOT NULL REFERENCES semester(id),
     alasan        VARCHAR(255),
-    dibuat_pada   TIMESTAMPTZ DEFAULT now(),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(guru_id, hari_id, semester_id)
 );
 
@@ -127,8 +130,8 @@ CREATE TABLE jadwal_semester (
     semester_id     UUID NOT NULL REFERENCES semester(id),
     status          VARCHAR(20) NOT NULL DEFAULT 'draf',
     bebas_konflik   BOOLEAN DEFAULT false,
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada TIMESTAMPTZ DEFAULT now(),
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(semester_id)
 );
 
@@ -137,7 +140,8 @@ CREATE TABLE jadwal_semester_jurusan (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     jadwal_semester_id  UUID NOT NULL REFERENCES jadwal_semester(id) ON DELETE CASCADE,
     jurusan_id          UUID NOT NULL REFERENCES jurusan(id) ON DELETE CASCADE,
-    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE(jadwal_semester_id, jurusan_id)
 );
 
@@ -149,8 +153,8 @@ CREATE TABLE jadwal_kelas (
     kelas_id            UUID NOT NULL REFERENCES kelas(id),
     versi               INT NOT NULL DEFAULT 1,
     is_active           BOOLEAN DEFAULT false,
-    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada     TIMESTAMPTZ DEFAULT now(),
+    created_at         TIMESTAMPTZ DEFAULT now(),
+    updated_at     TIMESTAMPTZ DEFAULT now(),
     UNIQUE(jadwal_semester_id, kelas_id, versi)
 );
 
@@ -166,8 +170,8 @@ CREATE TABLE slot_jadwal (
     guru_id           UUID REFERENCES guru(id),
     minggu_ke         SMALLINT DEFAULT 1,
     terkunci          BOOLEAN DEFAULT false,
-    dibuat_pada       TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada   TIMESTAMPTZ DEFAULT now(),
+    created_at       TIMESTAMPTZ DEFAULT now(),
+    updated_at   TIMESTAMPTZ DEFAULT now(),
     UNIQUE(jadwal_kelas_id, kelas_id, hari_id, jam_pelajaran_id, minggu_ke),
     UNIQUE(jadwal_kelas_id, ruangan_id, hari_id, jam_pelajaran_id, minggu_ke),
     UNIQUE(jadwal_kelas_id, guru_id, hari_id, jam_pelajaran_id, minggu_ke)
@@ -202,7 +206,9 @@ CREATE TABLE konflik (
     terselesaikan       BOOLEAN DEFAULT false,
     diselesaikan_oleh   VARCHAR(20),
     terdeteksi_pada     TIMESTAMPTZ DEFAULT now(),
-    terselesaikan_pada  TIMESTAMPTZ
+    terselesaikan_pada  TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_konflik_jadwal_semester ON konflik(jadwal_semester_id);
@@ -222,7 +228,8 @@ CREATE TABLE resolusi_ai (
     usulan_perubahan_json   JSONB NOT NULL,
     penjelasan              TEXT NOT NULL,
     diterima                BOOLEAN DEFAULT false,
-    dibuat_pada             TIMESTAMPTZ DEFAULT now(),
+    created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (skor_keyakinan >= 0 AND skor_keyakinan <= 1)
 );
 
@@ -236,7 +243,8 @@ CREATE TABLE log_audit_jadwal (
     aksi                VARCHAR(50) NOT NULL,
     perubahan_json      JSONB NOT NULL,
     dilakukan_oleh      VARCHAR(100) DEFAULT 'sistem',
-    dibuat_pada         TIMESTAMPTZ DEFAULT now()
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ============================================
@@ -249,12 +257,12 @@ CREATE TABLE sesi_chat_ai (
     jadwal_semester_id  UUID REFERENCES jadwal_semester(id) ON DELETE SET NULL,
     dilakukan_oleh      VARCHAR(100) NOT NULL DEFAULT 'anonim',
     judul               VARCHAR(200),
-    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada     TIMESTAMPTZ DEFAULT now()
+    created_at         TIMESTAMPTZ DEFAULT now(),
+    updated_at     TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX idx_sesi_chat_jadwal ON sesi_chat_ai(jadwal_semester_id);
-CREATE INDEX idx_sesi_chat_pengguna ON sesi_chat_ai(dilakukan_oleh, dibuat_pada DESC);
+CREATE INDEX idx_sesi_chat_pengguna ON sesi_chat_ai(dilakukan_oleh, created_at DESC);
 
 -- Riwayat pesan dalam sesi (pertanyaan + jawaban asisten)
 CREATE TABLE pesan_chat_ai (
@@ -263,11 +271,11 @@ CREATE TABLE pesan_chat_ai (
     peran           VARCHAR(20) NOT NULL,
     isi             TEXT NOT NULL,
     metadata_json   JSONB,
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
+    created_at     TIMESTAMPTZ DEFAULT now(),
     CHECK (peran IN ('pengguna', 'asisten', 'sistem'))
 );
 
-CREATE INDEX idx_pesan_chat_sesi ON pesan_chat_ai(sesi_chat_id, dibuat_pada);
+CREATE INDEX idx_pesan_chat_sesi ON pesan_chat_ai(sesi_chat_id, created_at);
 
 -- Feedback pengguna atas jawaban / sesi chatbot
 CREATE TABLE feedback_chat_ai (
@@ -278,7 +286,7 @@ CREATE TABLE feedback_chat_ai (
     jenis           VARCHAR(30) NOT NULL,
     komentar        TEXT,
     dilakukan_oleh  VARCHAR(100) NOT NULL DEFAULT 'anonim',
-    dibuat_pada     TIMESTAMPTZ DEFAULT now(),
+    created_at     TIMESTAMPTZ DEFAULT now(),
     CHECK (nilai IS NULL OR (nilai >= 1 AND nilai <= 5)),
     CHECK (jenis IN ('positif', 'negatif', 'saran', 'laporkan'))
 );
@@ -296,8 +304,8 @@ CREATE TABLE memori_chatbot (
     fakta_json          JSONB,
     sumber_sesi_chat_id UUID REFERENCES sesi_chat_ai(id) ON DELETE SET NULL,
     aktif               BOOLEAN DEFAULT true,
-    dibuat_pada         TIMESTAMPTZ DEFAULT now(),
-    diperbarui_pada     TIMESTAMPTZ DEFAULT now()
+    created_at         TIMESTAMPTZ DEFAULT now(),
+    updated_at     TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE INDEX idx_memori_chatbot_pengguna ON memori_chatbot(dilakukan_oleh, aktif);

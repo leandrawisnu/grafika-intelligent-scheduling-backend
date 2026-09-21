@@ -28,7 +28,7 @@ func (s *LayananJadwal) BuatJadwalSemester(semesterID uuid.UUID) (*models.Jadwal
 
 func (s *LayananJadwal) DaftarJadwalSemester() ([]models.JadwalSemester, error) {
 	var list []models.JadwalSemester
-	if err := s.db.Preload("Semester.TahunAjaran").Preload("Jurusan.Jurusan").Order("dibuat_pada DESC").Find(&list).Error; err != nil {
+	if err := s.db.Preload("Semester.TahunAjaran").Preload("Jurusan.Jurusan").Order("created_at DESC").Find(&list).Error; err != nil {
 		return nil, err
 	}
 	return list, nil

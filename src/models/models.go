@@ -8,10 +8,9 @@ import (
 )
 
 type BaseModel struct {
-	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	CreatedAt time.Time      `gorm:"column:dibuat_pada" json:"dibuat_pada"`
-	UpdatedAt time.Time      `gorm:"column:diperbarui_pada" json:"diperbarui_pada"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 func (b *BaseModel) BeforeCreate(tx *gorm.DB) error {
@@ -80,9 +79,9 @@ type Kelas struct {
 	Nama       string    `gorm:"not null;column:nama;size:100" json:"nama"`
 	Tingkat    int16     `gorm:"not null;column:tingkat" json:"tingkat"`
 	JurusanID  uuid.UUID `gorm:"type:uuid;column:jurusan_id" json:"jurusan_id"`
-	Jurusan    *Jurusan
+	Jurusan    *Jurusan  `gorm:"foreignKey:JurusanID" json:"jurusan,omitempty"`
 	SemesterID uuid.UUID `gorm:"not null;type:uuid;column:semester_id" json:"semester_id"`
-	Semester   *Semester
+	Semester   *Semester `gorm:"foreignKey:SemesterID" json:"semester,omitempty"`
 }
 
 func (Kelas) TableName() string { return "kelas" }
@@ -103,7 +102,8 @@ type Hari struct {
 	Nama      string    `gorm:"uniqueIndex;not null;column:nama;size:20" json:"nama"`
 	UrutanHari int16    `gorm:"uniqueIndex;not null;column:urutan_hari" json:"urutan_hari"`
 	AkhirPekan bool     `gorm:"default:false;column:akhir_pekan" json:"akhir_pekan"`
-	DibuatPada time.Time `gorm:"column:dibuat_pada" json:"dibuat_pada"`
+	CreatedAt  time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt  time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
 
 func (Hari) TableName() string { return "hari" }
@@ -271,7 +271,7 @@ type PesanChatAI struct {
 	Peran        string    `gorm:"not null;column:peran;size:20" json:"peran"`
 	Isi          string    `gorm:"not null;type:text;column:isi" json:"isi"`
 	MetadataJSON *string   `gorm:"type:jsonb;column:metadata_json" json:"metadata_json,omitempty"`
-	DibuatPada   time.Time `gorm:"autoCreateTime;column:dibuat_pada" json:"dibuat_pada"`
+	CreatedAt    time.Time `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 }
 
 func (PesanChatAI) TableName() string { return "pesan_chat_ai" }
@@ -293,7 +293,7 @@ type FeedbackChatAI struct {
 	Jenis         string     `gorm:"not null;column:jenis;size:30" json:"jenis"`
 	Komentar      *string    `gorm:"type:text;column:komentar" json:"komentar"`
 	DilakukanOleh string     `gorm:"not null;default:anonim;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
-	DibuatPada    time.Time  `gorm:"autoCreateTime;column:dibuat_pada" json:"dibuat_pada"`
+	CreatedAt     time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 }
 
 func (FeedbackChatAI) TableName() string { return "feedback_chat_ai" }

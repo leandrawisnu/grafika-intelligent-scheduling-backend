@@ -53,7 +53,7 @@ func Load() *Config {
 		DBUser:       getEnv("DB_USER", "grafika"),
 		DBPassword:   getEnv("DB_PASSWORD", "grafika_dev"),
 		DBName:       getEnv("DB_NAME", "grafika"),
-		DBPort:       getEnvInt("DB_PORT", 5433),
+		DBPort:       getEnvInt("DB_PORT", 5432),
 		databaseURL:  os.Getenv("DATABASE_URL"),
 		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8000"),
 		AutoMigrate:  getEnvBool("GIS_AUTO_MIGRATE", false),

@@ -1,4 +1,4 @@
-.PHONY: start dev test build migrate-init migrate-up migrate-down migrate-status migrate-force create-migration db-up db-down
+.PHONY: start dev test build migrate-init migrate-up migrate-down migrate-status migrate-force create-migration db-up db-down air-install
 
 ifneq (,$(wildcard .env))
 include .env
@@ -8,8 +8,13 @@ endif
 start:
 	@go run ./src
 
+air-install:
+	@go install github.com/air-verse/air@latest
+
 dev:
-	@air
+	@export PATH="$$(go env GOPATH)/bin:$$PATH"; \
+	command -v air >/dev/null 2>&1 || { echo "Install: make air-install" >&2; exit 1; }; \
+	air
 
 test:
 	@go test ./...

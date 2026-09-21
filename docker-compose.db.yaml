@@ -1,5 +1,7 @@
-# Postgres lokal dev (host DB untuk backend, pola KAI BIOP).
-# Jalankan: docker compose -f docker-compose.db.yaml up -d
+# Opsional — Postgres di Docker (bukan default dev).
+# Default dev: Postgres native localhost:5432. Pakai ini bila perlu container;
+# set DB_PORT=5433 di .env (mapping di bawah).
+# Jalankan: make db-up
 
 version: "3.5"
 

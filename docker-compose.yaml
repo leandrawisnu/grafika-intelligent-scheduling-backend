@@ -1,6 +1,6 @@
 # Start order (dev):
 #   1. docker network create main-network   (once, jika pakai ML/FE di jaringan yang sama)
-#   2. docker compose -f docker-compose.db.yaml up -d   (Postgres di host)
+#   2. (opsional) make db-up — Postgres Docker; default dev pakai Postgres lokal :5432
 #   3. go run ./src -migrate init   atau  make migrate-init
 #   4. Backend (web-api) — ini file compose API
 #   5. ML / frontend (repo terpisah) bila ada
@@ -28,7 +28,7 @@ services:
       - DB_USER=${DB_USER:-grafika}
       - DB_PASSWORD=${DB_PASSWORD:-grafika_dev}
       - DB_NAME=${DB_NAME:-grafika}
-      - DB_PORT=${DB_PORT:-5433}
+      - DB_PORT=${DB_PORT:-5432}
       - TZ=Asia/Jakarta
       - GIS_AUTO_MIGRATE=${GIS_AUTO_MIGRATE:-false}
     healthcheck:

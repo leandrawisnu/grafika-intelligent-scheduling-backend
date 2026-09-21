@@ -80,7 +80,7 @@ func (h *PengelolaMaster) DaftarHari(c *fiber.Ctx) error {
 // Tahun Ajaran
 func (h *PengelolaMaster) DaftarTahunAjaran(c *fiber.Ctx) error {
 	var items []models.TahunAjaran
-	h.db.Order("dibuat_pada DESC").Find(&items)
+	h.db.Order("created_at DESC").Find(&items)
 	return c.JSON(items)
 }
 
@@ -124,7 +124,7 @@ func (h *PengelolaMaster) HapusTahunAjaran(c *fiber.Ctx) error {
 // Semester
 func (h *PengelolaMaster) DaftarSemester(c *fiber.Ctx) error {
 	var items []models.Semester
-	q := h.db.Order("dibuat_pada DESC").Preload("TahunAjaran")
+	q := h.db.Order("created_at DESC").Preload("TahunAjaran")
 	if ayID := c.Query("tahun_ajaran_id"); ayID != "" {
 		q = q.Where("tahun_ajaran_id = ?", ayID)
 	}
@@ -335,7 +335,12 @@ func (h *PengelolaMaster) BuatKelas(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	h.db.Create(&item)
+	item.Jurusan = nil
+	item.Semester = nil
+	if err := h.db.Create(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Preload("Jurusan").Preload("Semester").First(&item, "id = ?", item.ID)
 	return c.Status(201).JSON(item)
 }
 
@@ -354,7 +359,17 @@ func (h *PengelolaMaster) PerbaruiKelas(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	h.db.Model(&models.Kelas{}).Where("id = ?", id).Updates(&item)
+	item.Jurusan = nil
+	item.Semester = nil
+	if err := h.db.Model(&models.Kelas{}).Where("id = ?", id).Updates(map[string]interface{}{
+		"kode":        item.Kode,
+		"nama":        item.Nama,
+		"tingkat":     item.Tingkat,
+		"jurusan_id":  item.JurusanID,
+		"semester_id": item.SemesterID,
+	}).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	h.db.Preload("Jurusan").Preload("Semester").First(&item, "id = ?", id)
 	return c.JSON(item)
 }
