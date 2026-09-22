@@ -28,6 +28,7 @@ Buat user/database di Postgres lokal sesuai `.env`, lalu:
 
 ```bash
 make migrate-init
+make seed-ganjil   # opsional: master + jadwal semester skeleton (Ganjil 2026/2027)
 make start
 curl -s http://127.0.0.1:8080/health
 ```
@@ -46,6 +47,8 @@ make db-up
 | `make start` | `go run ./src` (tanpa reload) |
 | `make air-install` | `go install` Air ke `$(go env GOPATH)/bin` |
 | `make migrate-init` / `migrate-up` / … | Migrasi |
+| `make seed-ganjil` | Data demo Ganjil 2026/2027 (skeleton, tanpa slot) |
+| `make seed-slots` | Mapel, guru, slot jadwal template (50 kelas) |
 | `make db-up` / `db-down` | Postgres Docker saja (opsional) |
 
 ## Docker API (`web-api`)

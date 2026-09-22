@@ -1,4 +1,4 @@
-.PHONY: start dev test build migrate-init migrate-up migrate-down migrate-status migrate-force create-migration db-up db-down air-install
+.PHONY: start dev test build migrate-init migrate-up migrate-down migrate-status migrate-force create-migration seed-ganjil db-up db-down air-install
 
 ifneq (,$(wildcard .env))
 include .env
@@ -43,6 +43,12 @@ migrate-status:
 migrate-force:
 	@test -n "$(VERSION)" || (echo "usage: make migrate-force VERSION=20260920123000" >&2; exit 1)
 	@go run ./src -migrate force $(VERSION)
+
+seed-ganjil:
+	@bash scripts/seed-ganjil-2026.sh
+
+seed-slots:
+	@bash scripts/seed-ganjil-slots.sh
 
 create-migration:
 	@test -n "$(NAME)" || (echo "usage: make create-migration NAME=add_example" >&2; exit 1)
