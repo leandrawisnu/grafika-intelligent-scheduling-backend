@@ -23,6 +23,9 @@ func (s *LayananJadwal) BuatJadwalSemester(semesterID uuid.UUID) (*models.Jadwal
 	if err := s.db.Create(js).Error; err != nil {
 		return nil, fmt.Errorf("gagal buat jadwal semester: %w", err)
 	}
+	if err := s.db.Preload("Semester.TahunAjaran").First(js, "id = ?", js.ID).Error; err != nil {
+		return nil, err
+	}
 	return js, nil
 }
 

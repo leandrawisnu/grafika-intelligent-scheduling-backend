@@ -24,22 +24,22 @@ func (b *BaseModel) BeforeCreate(tx *gorm.DB) error {
 
 type TahunAjaran struct {
 	BaseModel
-	Nama           string    `gorm:"uniqueIndex;not null;column:nama" json:"nama"`
-	TanggalMulai   time.Time `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
-	TanggalSelesai time.Time `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
-	Aktif          bool      `gorm:"default:true;column:aktif" json:"aktif"`
+	Nama           string  `gorm:"uniqueIndex;not null;column:nama" json:"nama"`
+	TanggalMulai   APIDate `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
+	TanggalSelesai APIDate `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
+	Aktif          bool    `gorm:"default:true;column:aktif" json:"aktif"`
 }
 
 func (TahunAjaran) TableName() string { return "tahun_ajaran" }
 
 type Semester struct {
 	BaseModel
-	TahunAjaranID  uuid.UUID  `gorm:"not null;column:tahun_ajaran_id" json:"tahun_ajaran_id"`
-	TahunAjaran    *TahunAjaran
+	TahunAjaranID  uuid.UUID     `gorm:"not null;column:tahun_ajaran_id" json:"tahun_ajaran_id"`
+	TahunAjaran    *TahunAjaran  `json:"tahun_ajaran,omitempty"`
 	Nama           string    `gorm:"not null;column:nama" json:"nama"`
 	SemesterKe     int16     `gorm:"not null;column:semester_ke" json:"semester_ke"`
-	TanggalMulai   time.Time `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
-	TanggalSelesai time.Time `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
+	TanggalMulai   APIDate `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
+	TanggalSelesai APIDate `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
 	Aktif          bool      `gorm:"default:true;column:aktif" json:"aktif"`
 }
 
@@ -139,7 +139,7 @@ func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
 type JadwalSemester struct {
 	BaseModel
 	SemesterID   uuid.UUID              `gorm:"not null;column:semester_id" json:"semester_id"`
-	Semester     *Semester
+	Semester     *Semester              `json:"semester,omitempty"`
 	Status       string                 `gorm:"not null;default:draf;column:status;size:20" json:"status"`
 	BebasKonflik bool                   `gorm:"default:false;column:bebas_konflik" json:"bebas_konflik"`
 	Jurusan      []JadwalSemesterJurusan `gorm:"foreignKey:JadwalSemesterID" json:"jurusan,omitempty"`
@@ -154,7 +154,7 @@ type JadwalSemesterJurusan struct {
 	JadwalSemesterID uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester   *JadwalSemester
 	JurusanID        uuid.UUID  `gorm:"not null;type:uuid;column:jurusan_id" json:"jurusan_id"`
-	Jurusan          *Jurusan
+	Jurusan          *Jurusan   `json:"jurusan,omitempty"`
 }
 
 func (JadwalSemesterJurusan) TableName() string { return "jadwal_semester_jurusan" }

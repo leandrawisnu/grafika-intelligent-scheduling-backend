@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/grafika-scheduling/backend/src/config"
 	"github.com/grafika-scheduling/backend/src/database"
 	"github.com/grafika-scheduling/backend/src/router"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/pkg/timezone"
 )
 
 func main() {
@@ -17,6 +19,7 @@ func main() {
 	flag.Parse()
 
 	cfg := config.Load()
+	time.Local = timezone.Loc
 	dsn := cfg.DatabaseURL()
 
 	if *migrateCmd != "" {
