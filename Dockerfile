@@ -25,9 +25,12 @@ WORKDIR /app
 
 COPY --from=build-stage --chown=appuser:appuser /out/main ./main
 COPY --from=build-stage --chown=appuser:appuser /src/database/migrations ./database/migrations
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x ./docker-entrypoint.sh && chown appuser:appuser ./docker-entrypoint.sh
 
 ENV APP_HOST=0.0.0.0 \
     APP_PORT=8080 \
+    GIS_MODULE_ROOT=/app \
     TZ=Asia/Jakarta
 
 EXPOSE 8080
@@ -37,4 +40,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${APP_PORT}/health" >/dev/null || exit 1
 
-CMD ["./main"]
+ENTRYPOINT ["./docker-entrypoint.sh"]
