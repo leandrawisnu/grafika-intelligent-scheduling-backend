@@ -165,9 +165,9 @@ type JadwalKelas struct {
 	JadwalSemesterID uuid.UUID    `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester   *JadwalSemester
 	JurusanID        uuid.UUID    `gorm:"not null;type:uuid;column:jurusan_id" json:"jurusan_id"`
-	Jurusan          *Jurusan
+	Jurusan          *Jurusan     `json:"jurusan,omitempty"`
 	KelasID          uuid.UUID    `gorm:"not null;type:uuid;column:kelas_id" json:"kelas_id"`
-	Kelas            *Kelas
+	Kelas            *Kelas       `json:"kelas,omitempty"`
 	Versi            int          `gorm:"not null;default:1;column:versi" json:"versi"`
 	IsActive         bool         `gorm:"default:false;column:is_active" json:"is_active"`
 	SlotJadwal       []SlotJadwal  `gorm:"foreignKey:JadwalKelasID" json:"slot_jadwal,omitempty"`
@@ -181,17 +181,17 @@ type SlotJadwal struct {
 	JadwalKelasID    uuid.UUID     `gorm:"not null;type:uuid;column:jadwal_kelas_id" json:"jadwal_kelas_id"`
 	JadwalKelas      *JadwalKelas
 	KelasID          uuid.UUID     `gorm:"not null;type:uuid;column:kelas_id" json:"kelas_id"`
-	Kelas            *Kelas
+	Kelas            *Kelas        `json:"kelas,omitempty"`
 	MataPelajaranID  uuid.UUID     `gorm:"not null;type:uuid;column:mata_pelajaran_id" json:"mata_pelajaran_id"`
-	MataPelajaran    *MataPelajaran
+	MataPelajaran    *MataPelajaran `json:"mata_pelajaran,omitempty"`
 	HariID           uuid.UUID     `gorm:"not null;type:uuid;column:hari_id" json:"hari_id"`
-	Hari             *Hari
+	Hari             *Hari         `json:"hari,omitempty"`
 	JamPelajaranID   uuid.UUID     `gorm:"not null;type:uuid;column:jam_pelajaran_id" json:"jam_pelajaran_id"`
-	JamPelajaran     *JamPelajaran
+	JamPelajaran     *JamPelajaran `json:"jam_pelajaran,omitempty"`
 	RuanganID        uuid.UUID     `gorm:"type:uuid;column:ruangan_id" json:"ruangan_id"`
-	Ruangan          *Ruangan
+	Ruangan          *Ruangan      `json:"ruangan,omitempty"`
 	GuruID           uuid.UUID     `gorm:"type:uuid;column:guru_id" json:"guru_id"`
-	Guru             *Guru
+	Guru             *Guru         `json:"guru,omitempty"`
 	MingguKe         int16         `gorm:"default:1;column:minggu_ke" json:"minggu_ke"`
 	Terkunci         bool          `gorm:"default:false;column:terkunci" json:"terkunci"`
 }
