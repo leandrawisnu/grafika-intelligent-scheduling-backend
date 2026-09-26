@@ -6,10 +6,11 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/dto"
 	"github.com/grafika-scheduling/backend/src/models"
 	"github.com/grafika-scheduling/backend/src/services"
-	"github.com/grafika-scheduling/backend/pkg/mlclient"
 	"gorm.io/gorm"
 )
 
@@ -95,6 +96,14 @@ func (h *PengelolaJadwal) DaftarJadwalSemester(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+	if _, ok := auth.Terbatas(c); ok {
+		saring := make([]models.JadwalSemester, 0)
+		for i := range list {
+			auth.SaringSemester(c, &list[i])
+			saring = append(saring, list[i])
+		}
+		list = saring
+	}
 	return c.JSON(list)
 }
 
@@ -104,6 +113,7 @@ func (h *PengelolaJadwal) AmbilJadwalSemester(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
+	auth.SaringSemester(c, js)
 	return c.JSON(js)
 }
 
@@ -190,6 +200,9 @@ func (h *PengelolaJadwal) AmbilJadwalKelas(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
+	if terbatas, ok := auth.Terbatas(c); ok && jk.JurusanID != terbatas {
+		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	}
 	return c.JSON(jk)
 }
 
@@ -198,6 +211,15 @@ func (h *PengelolaJadwal) SemuaJadwalKelasAktif(c *fiber.Ctx) error {
 	list, err := h.layananJadwal.AmbilSemuaJadwalKelasAktif(jsID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	if terbatas, ok := auth.Terbatas(c); ok {
+		saring := make([]models.JadwalKelas, 0)
+		for _, item := range list {
+			if item.JurusanID == terbatas {
+				saring = append(saring, item)
+			}
+		}
+		list = saring
 	}
 	return c.JSON(list)
 }
@@ -378,12 +400,24 @@ func (h *PengelolaJadwal) PrediksiKonflik(c *fiber.Ctx) error {
 			jam := ""
 			namaRuang := ""
 			namaGuru := ""
-			if slot.Kelas != nil { namaKelas = slot.Kelas.Nama }
-			if slot.MataPelajaran != nil { namaMapel = slot.MataPelajaran.Nama }
-			if slot.Hari != nil { namaHari = slot.Hari.Nama }
-			if slot.JamPelajaran != nil { jam = slot.JamPelajaran.WaktuMulai }
-			if slot.Ruangan != nil { namaRuang = slot.Ruangan.Nama }
-			if slot.Guru != nil { namaGuru = slot.Guru.NamaLengkap }
+			if slot.Kelas != nil {
+				namaKelas = slot.Kelas.Nama
+			}
+			if slot.MataPelajaran != nil {
+				namaMapel = slot.MataPelajaran.Nama
+			}
+			if slot.Hari != nil {
+				namaHari = slot.Hari.Nama
+			}
+			if slot.JamPelajaran != nil {
+				jam = slot.JamPelajaran.WaktuMulai
+			}
+			if slot.Ruangan != nil {
+				namaRuang = slot.Ruangan.Nama
+			}
+			if slot.Guru != nil {
+				namaGuru = slot.Guru.NamaLengkap
+			}
 
 			slots = append(slots, dto.SlotUntukML{
 				ID:       slot.ID.String(),
@@ -521,7 +555,7 @@ func (h *PengelolaJadwal) TerimaResolusi(c *fiber.Ctx) error {
 	h.db.Model(&models.Konflik{}).Where("id = ?", resolusi.KonflikID).
 		Updates(map[string]interface{}{
 			"terselesaikan":      true,
-			"diselesaikan_oleh": "ai",
+			"diselesaikan_oleh":  "ai",
 			"terselesaikan_pada": time.Now(),
 		})
 
@@ -560,7 +594,7 @@ func (h *PengelolaJadwal) AITanya(c *fiber.Ctx) error {
 	}
 
 	reqML := dto.MLQueryRequest{
-		Pertanyaan:    req.Pertanyaan,
+		Pertanyaan:       req.Pertanyaan,
 		JadwalSemesterID: req.JadwalSemesterID,
 	}
 

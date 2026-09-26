@@ -3,6 +3,7 @@ package handlers
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/gorm"
 )
@@ -179,7 +180,11 @@ func (h *PengelolaMaster) HapusSemester(c *fiber.Ctx) error {
 // Jurusan
 func (h *PengelolaMaster) DaftarJurusan(c *fiber.Ctx) error {
 	items := make([]models.Jurusan, 0)
-	err := h.db.Order("kode").Find(&items).Error
+	q := h.db.Order("kode")
+	if id, ok := auth.Terbatas(c); ok {
+		q = q.Where("id = ?", id)
+	}
+	err := q.Find(&items).Error
 	return listJSON(c, err, items)
 }
 
@@ -196,6 +201,9 @@ func (h *PengelolaMaster) AmbilJurusan(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 	var item models.Jurusan
 	if h.db.First(&item, "id = ?", id).Error != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	}
+	if terbatas, ok := auth.Terbatas(c); ok && item.ID != terbatas {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
 	return c.JSON(item)
@@ -333,6 +341,9 @@ func (h *PengelolaMaster) DaftarKelas(c *fiber.Ctx) error {
 	if semID := c.Query("semester_id"); semID != "" {
 		q = q.Where("semester_id = ?", semID)
 	}
+	if id, ok := auth.Terbatas(c); ok {
+		q = q.Where("jurusan_id = ?", id)
+	}
 	err := q.Find(&items).Error
 	return listJSON(c, err, items)
 }
@@ -355,6 +366,9 @@ func (h *PengelolaMaster) AmbilKelas(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 	var item models.Kelas
 	if h.db.Preload("Jurusan").Preload("Semester").First(&item, "id = ?", id).Error != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	}
+	if terbatas, ok := auth.Terbatas(c); ok && item.JurusanID != terbatas {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
 	return c.JSON(item)
