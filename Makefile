@@ -32,7 +32,7 @@ migrate-init:
 	@go run ./src -migrate init
 
 migrate-up:
-	@go run ./src -migrate up
+	@cd src && go run main.go -migrate
 
 migrate-down:
 	@go run ./src -migrate down

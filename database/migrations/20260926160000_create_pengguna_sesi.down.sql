@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS sesi;
+DROP TABLE IF EXISTS pengguna;

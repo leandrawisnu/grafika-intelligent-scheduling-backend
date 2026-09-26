@@ -7,23 +7,30 @@ import (
 	"os"
 	"time"
 
+	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/pkg/timezone"
+	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/config"
 	"github.com/grafika-scheduling/backend/src/database"
 	"github.com/grafika-scheduling/backend/src/router"
-	"github.com/grafika-scheduling/backend/pkg/mlclient"
-	"github.com/grafika-scheduling/backend/pkg/timezone"
 )
 
 func main() {
-	migrateCmd := flag.String("migrate", "", "jalankan migrasi lalu keluar: init, up, down, version, force (force butuh arg versi di flag.Args)")
+	migrateFlag := flag.Bool("migrate", false, "jalankan migrasi lalu keluar. Tanpa argumen sama dengan up. Argumen: init, up, down, version, force <versi>")
 	flag.Parse()
 
 	cfg := config.Load()
 	time.Local = timezone.Loc
 	dsn := cfg.DatabaseURL()
 
-	if *migrateCmd != "" {
-		if err := runMigrateMode(dsn, *migrateCmd, flag.Args()); err != nil {
+	if *migrateFlag {
+		command := "up"
+		args := flag.Args()
+		if len(args) > 0 {
+			command = args[0]
+			args = args[1:]
+		}
+		if err := runMigrateMode(dsn, command, args); err != nil {
 			log.Fatalf("migrate: %v", err)
 		}
 		return
@@ -35,9 +42,12 @@ func main() {
 			log.Fatalf("Gagal auto-migrate: %v", err)
 		}
 	}
+	if err := auth.NewLayanan(db).PastikanAdmin(cfg.AdminEmail, cfg.AdminPassword); err != nil {
+		log.Fatalf("akun admin: %v", err)
+	}
 	mlClient := mlclient.NewClient(cfg.MLServiceURL)
 
-	app := router.New(db, mlClient)
+	app := router.New(db, mlClient, cfg)
 
 	log.Printf("Grafika Scheduling mendengarkan %s\n", cfg.ListenAddr())
 	if err := app.Listen(cfg.ListenAddr()); err != nil {

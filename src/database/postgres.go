@@ -24,6 +24,8 @@ func AutoMigrate(db *gorm.DB) error {
 		&models.TahunAjaran{},
 		&models.Semester{},
 		&models.Jurusan{},
+		&models.Pengguna{},
+		&models.Sesi{},
 		&models.Guru{},
 		&models.MataPelajaran{},
 		&models.Kelas{},

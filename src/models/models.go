@@ -34,13 +34,13 @@ func (TahunAjaran) TableName() string { return "tahun_ajaran" }
 
 type Semester struct {
 	BaseModel
-	TahunAjaranID  uuid.UUID     `gorm:"not null;column:tahun_ajaran_id" json:"tahun_ajaran_id"`
-	TahunAjaran    *TahunAjaran  `json:"tahun_ajaran,omitempty"`
-	Nama           string    `gorm:"not null;column:nama" json:"nama"`
-	SemesterKe     int16     `gorm:"not null;column:semester_ke" json:"semester_ke"`
-	TanggalMulai   APIDate `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
-	TanggalSelesai APIDate `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
-	Aktif          bool      `gorm:"default:true;column:aktif" json:"aktif"`
+	TahunAjaranID  uuid.UUID    `gorm:"not null;column:tahun_ajaran_id" json:"tahun_ajaran_id"`
+	TahunAjaran    *TahunAjaran `json:"tahun_ajaran,omitempty"`
+	Nama           string       `gorm:"not null;column:nama" json:"nama"`
+	SemesterKe     int16        `gorm:"not null;column:semester_ke" json:"semester_ke"`
+	TanggalMulai   APIDate      `gorm:"type:date;not null;column:tanggal_mulai" json:"tanggal_mulai"`
+	TanggalSelesai APIDate      `gorm:"type:date;not null;column:tanggal_selesai" json:"tanggal_selesai"`
+	Aktif          bool         `gorm:"default:true;column:aktif" json:"aktif"`
 }
 
 func (Semester) TableName() string { return "semester" }
@@ -53,22 +53,44 @@ type Jurusan struct {
 
 func (Jurusan) TableName() string { return "jurusan" }
 
+type Pengguna struct {
+	BaseModel
+	Email        string     `gorm:"uniqueIndex;not null;column:email;size:255" json:"email"`
+	PasswordHash string     `gorm:"not null;column:password_hash" json:"-"`
+	Peran        string     `gorm:"not null;column:peran;size:30" json:"peran"`
+	JurusanID    *uuid.UUID `gorm:"type:uuid;column:jurusan_id" json:"jurusan_id,omitempty"`
+	Jurusan      *Jurusan   `gorm:"foreignKey:JurusanID" json:"jurusan,omitempty"`
+	Aktif        bool       `gorm:"not null;default:true;column:aktif" json:"aktif"`
+}
+
+func (Pengguna) TableName() string { return "pengguna" }
+
+type Sesi struct {
+	BaseModel
+	PenggunaID  uuid.UUID `gorm:"not null;type:uuid;column:pengguna_id;index" json:"pengguna_id"`
+	Pengguna    *Pengguna `gorm:"foreignKey:PenggunaID" json:"-"`
+	TokenHash   string    `gorm:"uniqueIndex;not null;column:token_hash;size:64" json:"-"`
+	Kedaluwarsa time.Time `gorm:"not null;column:kedaluwarsa" json:"kedaluwarsa"`
+}
+
+func (Sesi) TableName() string { return "sesi" }
+
 type Guru struct {
 	BaseModel
-	NIP                  string    `gorm:"uniqueIndex;not null;column:nip;size:30" json:"nip"`
-	NamaLengkap          string    `gorm:"not null;column:nama_lengkap;size:150" json:"nama_lengkap"`
-	JamMaksimalPerMinggu float64   `gorm:"not null;default:40.0;column:jam_maksimal_per_minggu" json:"jam_maksimal_per_minggu"`
-	Aktif                bool      `gorm:"default:true;column:aktif" json:"aktif"`
+	NIP                  string  `gorm:"uniqueIndex;not null;column:nip;size:30" json:"nip"`
+	NamaLengkap          string  `gorm:"not null;column:nama_lengkap;size:150" json:"nama_lengkap"`
+	JamMaksimalPerMinggu float64 `gorm:"not null;default:40.0;column:jam_maksimal_per_minggu" json:"jam_maksimal_per_minggu"`
+	Aktif                bool    `gorm:"default:true;column:aktif" json:"aktif"`
 }
 
 func (Guru) TableName() string { return "guru" }
 
 type MataPelajaran struct {
 	BaseModel
-	Kode              string    `gorm:"uniqueIndex;not null;column:kode;size:20" json:"kode"`
-	Nama              string    `gorm:"not null;column:nama;size:150" json:"nama"`
-	JamWajibPerMinggu float64   `gorm:"not null;column:jam_wajib_per_minggu" json:"jam_wajib_per_minggu"`
-	Tingkat           int16     `gorm:"not null;column:tingkat" json:"tingkat"`
+	Kode              string  `gorm:"uniqueIndex;not null;column:kode;size:20" json:"kode"`
+	Nama              string  `gorm:"not null;column:nama;size:150" json:"nama"`
+	JamWajibPerMinggu float64 `gorm:"not null;column:jam_wajib_per_minggu" json:"jam_wajib_per_minggu"`
+	Tingkat           int16   `gorm:"not null;column:tingkat" json:"tingkat"`
 }
 
 func (MataPelajaran) TableName() string { return "mata_pelajaran" }
@@ -98,10 +120,10 @@ type Ruangan struct {
 func (Ruangan) TableName() string { return "ruangan" }
 
 type Hari struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Nama      string    `gorm:"uniqueIndex;not null;column:nama;size:20" json:"nama"`
-	UrutanHari int16    `gorm:"uniqueIndex;not null;column:urutan_hari" json:"urutan_hari"`
-	AkhirPekan bool     `gorm:"default:false;column:akhir_pekan" json:"akhir_pekan"`
+	ID         uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Nama       string    `gorm:"uniqueIndex;not null;column:nama;size:20" json:"nama"`
+	UrutanHari int16     `gorm:"uniqueIndex;not null;column:urutan_hari" json:"urutan_hari"`
+	AkhirPekan bool      `gorm:"default:false;column:akhir_pekan" json:"akhir_pekan"`
 	CreatedAt  time.Time `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt  time.Time `gorm:"column:updated_at" json:"updated_at"`
 }
@@ -128,7 +150,7 @@ type HariLiburGuru struct {
 	Hari       *Hari
 	SemesterID uuid.UUID `gorm:"not null;type:uuid;column:semester_id" json:"semester_id"`
 	Semester   *Semester
-	Alasan     string    `gorm:"column:alasan;size:255" json:"alasan"`
+	Alasan     string `gorm:"column:alasan;size:255" json:"alasan"`
 }
 
 func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
@@ -138,10 +160,10 @@ func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
 // Master jadwal per semester
 type JadwalSemester struct {
 	BaseModel
-	SemesterID   uuid.UUID              `gorm:"not null;column:semester_id" json:"semester_id"`
-	Semester     *Semester              `json:"semester,omitempty"`
-	Status       string                 `gorm:"not null;default:draf;column:status;size:20" json:"status"`
-	BebasKonflik bool                   `gorm:"default:false;column:bebas_konflik" json:"bebas_konflik"`
+	SemesterID   uuid.UUID               `gorm:"not null;column:semester_id" json:"semester_id"`
+	Semester     *Semester               `json:"semester,omitempty"`
+	Status       string                  `gorm:"not null;default:draf;column:status;size:20" json:"status"`
+	BebasKonflik bool                    `gorm:"default:false;column:bebas_konflik" json:"bebas_konflik"`
 	Jurusan      []JadwalSemesterJurusan `gorm:"foreignKey:JadwalSemesterID" json:"jurusan,omitempty"`
 	JadwalKelas  []JadwalKelas           `gorm:"foreignKey:JadwalSemesterID" json:"jadwal_kelas,omitempty"`
 }
@@ -153,8 +175,8 @@ type JadwalSemesterJurusan struct {
 	BaseModel
 	JadwalSemesterID uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester   *JadwalSemester
-	JurusanID        uuid.UUID  `gorm:"not null;type:uuid;column:jurusan_id" json:"jurusan_id"`
-	Jurusan          *Jurusan   `json:"jurusan,omitempty"`
+	JurusanID        uuid.UUID `gorm:"not null;type:uuid;column:jurusan_id" json:"jurusan_id"`
+	Jurusan          *Jurusan  `json:"jurusan,omitempty"`
 }
 
 func (JadwalSemesterJurusan) TableName() string { return "jadwal_semester_jurusan" }
@@ -162,7 +184,7 @@ func (JadwalSemesterJurusan) TableName() string { return "jadwal_semester_jurusa
 // Jadwal per kelas (versioned)
 type JadwalKelas struct {
 	BaseModel
-	JadwalSemesterID uuid.UUID    `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemesterID uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester   *JadwalSemester
 	JurusanID        uuid.UUID    `gorm:"not null;type:uuid;column:jurusan_id" json:"jurusan_id"`
 	Jurusan          *Jurusan     `json:"jurusan,omitempty"`
@@ -170,7 +192,7 @@ type JadwalKelas struct {
 	Kelas            *Kelas       `json:"kelas,omitempty"`
 	Versi            int          `gorm:"not null;default:1;column:versi" json:"versi"`
 	IsActive         bool         `gorm:"default:false;column:is_active" json:"is_active"`
-	SlotJadwal       []SlotJadwal  `gorm:"foreignKey:JadwalKelasID" json:"slot_jadwal,omitempty"`
+	SlotJadwal       []SlotJadwal `gorm:"foreignKey:JadwalKelasID" json:"slot_jadwal,omitempty"`
 }
 
 func (JadwalKelas) TableName() string { return "jadwal_kelas" }
@@ -178,22 +200,22 @@ func (JadwalKelas) TableName() string { return "jadwal_kelas" }
 // Slot jadwal (FK ke jadwal_kelas)
 type SlotJadwal struct {
 	BaseModel
-	JadwalKelasID    uuid.UUID     `gorm:"not null;type:uuid;column:jadwal_kelas_id" json:"jadwal_kelas_id"`
-	JadwalKelas      *JadwalKelas
-	KelasID          uuid.UUID     `gorm:"not null;type:uuid;column:kelas_id" json:"kelas_id"`
-	Kelas            *Kelas        `json:"kelas,omitempty"`
-	MataPelajaranID  uuid.UUID     `gorm:"not null;type:uuid;column:mata_pelajaran_id" json:"mata_pelajaran_id"`
-	MataPelajaran    *MataPelajaran `json:"mata_pelajaran,omitempty"`
-	HariID           uuid.UUID     `gorm:"not null;type:uuid;column:hari_id" json:"hari_id"`
-	Hari             *Hari         `json:"hari,omitempty"`
-	JamPelajaranID   uuid.UUID     `gorm:"not null;type:uuid;column:jam_pelajaran_id" json:"jam_pelajaran_id"`
-	JamPelajaran     *JamPelajaran `json:"jam_pelajaran,omitempty"`
-	RuanganID        uuid.UUID     `gorm:"type:uuid;column:ruangan_id" json:"ruangan_id"`
-	Ruangan          *Ruangan      `json:"ruangan,omitempty"`
-	GuruID           uuid.UUID     `gorm:"type:uuid;column:guru_id" json:"guru_id"`
-	Guru             *Guru         `json:"guru,omitempty"`
-	MingguKe         int16         `gorm:"default:1;column:minggu_ke" json:"minggu_ke"`
-	Terkunci         bool          `gorm:"default:false;column:terkunci" json:"terkunci"`
+	JadwalKelasID   uuid.UUID `gorm:"not null;type:uuid;column:jadwal_kelas_id" json:"jadwal_kelas_id"`
+	JadwalKelas     *JadwalKelas
+	KelasID         uuid.UUID      `gorm:"not null;type:uuid;column:kelas_id" json:"kelas_id"`
+	Kelas           *Kelas         `json:"kelas,omitempty"`
+	MataPelajaranID uuid.UUID      `gorm:"not null;type:uuid;column:mata_pelajaran_id" json:"mata_pelajaran_id"`
+	MataPelajaran   *MataPelajaran `json:"mata_pelajaran,omitempty"`
+	HariID          uuid.UUID      `gorm:"not null;type:uuid;column:hari_id" json:"hari_id"`
+	Hari            *Hari          `json:"hari,omitempty"`
+	JamPelajaranID  uuid.UUID      `gorm:"not null;type:uuid;column:jam_pelajaran_id" json:"jam_pelajaran_id"`
+	JamPelajaran    *JamPelajaran  `json:"jam_pelajaran,omitempty"`
+	RuanganID       uuid.UUID      `gorm:"type:uuid;column:ruangan_id" json:"ruangan_id"`
+	Ruangan         *Ruangan       `json:"ruangan,omitempty"`
+	GuruID          uuid.UUID      `gorm:"type:uuid;column:guru_id" json:"guru_id"`
+	Guru            *Guru          `json:"guru,omitempty"`
+	MingguKe        int16          `gorm:"default:1;column:minggu_ke" json:"minggu_ke"`
+	Terkunci        bool           `gorm:"default:false;column:terkunci" json:"terkunci"`
 }
 
 func (SlotJadwal) TableName() string { return "slot_jadwal" }
@@ -202,15 +224,15 @@ func (SlotJadwal) TableName() string { return "slot_jadwal" }
 
 type Konflik struct {
 	BaseModel
-	JadwalSemesterID  uuid.UUID  `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemesterID  uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester    *JadwalSemester
-	TipeKonflik       string     `gorm:"not null;column:tipe_konflik;size:40" json:"tipe_konflik"`
-	TingkatKeparahan  string     `gorm:"not null;default:kesalahan;column:tingkat_keparahan;size:15" json:"tingkat_keparahan"`
-	SlotAID           *uuid.UUID `gorm:"type:uuid;column:slot_a_id" json:"slot_a_id"`
+	TipeKonflik       string      `gorm:"not null;column:tipe_konflik;size:40" json:"tipe_konflik"`
+	TingkatKeparahan  string      `gorm:"not null;default:kesalahan;column:tingkat_keparahan;size:15" json:"tingkat_keparahan"`
+	SlotAID           *uuid.UUID  `gorm:"type:uuid;column:slot_a_id" json:"slot_a_id"`
 	SlotA             *SlotJadwal `gorm:"foreignKey:SlotAID"`
-	SlotBID           *uuid.UUID `gorm:"type:uuid;column:slot_b_id" json:"slot_b_id"`
+	SlotBID           *uuid.UUID  `gorm:"type:uuid;column:slot_b_id" json:"slot_b_id"`
 	SlotB             *SlotJadwal `gorm:"foreignKey:SlotBID"`
-	GuruID            *uuid.UUID `gorm:"type:uuid;column:guru_id" json:"guru_id"`
+	GuruID            *uuid.UUID  `gorm:"type:uuid;column:guru_id" json:"guru_id"`
 	Guru              *Guru
 	Deskripsi         string     `gorm:"not null;type:text;column:deskripsi" json:"deskripsi"`
 	DetailJSON        *string    `gorm:"type:jsonb;column:detail_json" json:"detail_json"`
@@ -226,14 +248,14 @@ func (Konflik) TableName() string { return "konflik" }
 
 type ResolusiAI struct {
 	BaseModel
-	KonflikID            uuid.UUID `gorm:"not null;type:uuid;column:konflik_id" json:"konflik_id"`
-	JadwalSemesterID     uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
-	JadwalSemester       *JadwalSemester
-	Peringkat            int16     `gorm:"not null;column:peringkat" json:"peringkat"`
-	SkorKeyakinan        float64   `gorm:"not null;column:skor_keyakinan" json:"skor_keyakinan"`
-	UsulanPerubahanJSON  string    `gorm:"not null;type:jsonb;column:usulan_perubahan_json" json:"usulan_perubahan_json"`
-	Penjelasan           string    `gorm:"not null;type:text;column:penjelasan" json:"penjelasan"`
-	Diterima             bool      `gorm:"default:false;column:diterima" json:"diterima"`
+	KonflikID           uuid.UUID `gorm:"not null;type:uuid;column:konflik_id" json:"konflik_id"`
+	JadwalSemesterID    uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemester      *JadwalSemester
+	Peringkat           int16   `gorm:"not null;column:peringkat" json:"peringkat"`
+	SkorKeyakinan       float64 `gorm:"not null;column:skor_keyakinan" json:"skor_keyakinan"`
+	UsulanPerubahanJSON string  `gorm:"not null;type:jsonb;column:usulan_perubahan_json" json:"usulan_perubahan_json"`
+	Penjelasan          string  `gorm:"not null;type:text;column:penjelasan" json:"penjelasan"`
+	Diterima            bool    `gorm:"default:false;column:diterima" json:"diterima"`
 }
 
 func (ResolusiAI) TableName() string { return "resolusi_ai" }
@@ -244,9 +266,9 @@ type LogAuditJadwal struct {
 	BaseModel
 	JadwalSemesterID uuid.UUID `gorm:"not null;type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
 	JadwalSemester   *JadwalSemester
-	Aksi             string    `gorm:"not null;column:aksi;size:50" json:"aksi"`
-	PerubahanJSON    string    `gorm:"not null;type:jsonb;column:perubahan_json" json:"perubahan_json"`
-	DilakukanOleh    string    `gorm:"default:sistem;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	Aksi             string `gorm:"not null;column:aksi;size:50" json:"aksi"`
+	PerubahanJSON    string `gorm:"not null;type:jsonb;column:perubahan_json" json:"perubahan_json"`
+	DilakukanOleh    string `gorm:"default:sistem;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
 }
 
 func (LogAuditJadwal) TableName() string { return "log_audit_jadwal" }
@@ -284,16 +306,16 @@ func (p *PesanChatAI) BeforeCreate(tx *gorm.DB) error {
 }
 
 type FeedbackChatAI struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	SesiChatID    uuid.UUID  `gorm:"not null;type:uuid;column:sesi_chat_id" json:"sesi_chat_id"`
+	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	SesiChatID    uuid.UUID `gorm:"not null;type:uuid;column:sesi_chat_id" json:"sesi_chat_id"`
 	SesiChat      *SesiChatAI
 	PesanChatID   *uuid.UUID `gorm:"type:uuid;column:pesan_chat_id" json:"pesan_chat_id"`
 	PesanChat     *PesanChatAI
-	Nilai         *int16     `gorm:"column:nilai" json:"nilai"`
-	Jenis         string     `gorm:"not null;column:jenis;size:30" json:"jenis"`
-	Komentar      *string    `gorm:"type:text;column:komentar" json:"komentar"`
-	DilakukanOleh string     `gorm:"not null;default:anonim;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
-	CreatedAt     time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
+	Nilai         *int16    `gorm:"column:nilai" json:"nilai"`
+	Jenis         string    `gorm:"not null;column:jenis;size:30" json:"jenis"`
+	Komentar      *string   `gorm:"type:text;column:komentar" json:"komentar"`
+	DilakukanOleh string    `gorm:"not null;default:anonim;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	CreatedAt     time.Time `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 }
 
 func (FeedbackChatAI) TableName() string { return "feedback_chat_ai" }
@@ -307,15 +329,15 @@ func (f *FeedbackChatAI) BeforeCreate(tx *gorm.DB) error {
 
 type MemoriChatbot struct {
 	BaseModel
-	DilakukanOleh     string     `gorm:"not null;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
-	JadwalSemesterID  *uuid.UUID `gorm:"type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
-	JadwalSemester    *JadwalSemester
-	Kunci             string     `gorm:"not null;default:umum;column:kunci;size:100" json:"kunci"`
-	Ringkasan         string     `gorm:"not null;type:text;column:ringkasan" json:"ringkasan"`
-	FaktaJSON         *string    `gorm:"type:jsonb;column:fakta_json" json:"fakta_json,omitempty"`
-	SumberSesiChatID  *uuid.UUID `gorm:"type:uuid;column:sumber_sesi_chat_id" json:"sumber_sesi_chat_id"`
-	SumberSesiChat    *SesiChatAI
-	Aktif             bool       `gorm:"default:true;column:aktif" json:"aktif"`
+	DilakukanOleh    string     `gorm:"not null;column:dilakukan_oleh;size:100" json:"dilakukan_oleh"`
+	JadwalSemesterID *uuid.UUID `gorm:"type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id"`
+	JadwalSemester   *JadwalSemester
+	Kunci            string     `gorm:"not null;default:umum;column:kunci;size:100" json:"kunci"`
+	Ringkasan        string     `gorm:"not null;type:text;column:ringkasan" json:"ringkasan"`
+	FaktaJSON        *string    `gorm:"type:jsonb;column:fakta_json" json:"fakta_json,omitempty"`
+	SumberSesiChatID *uuid.UUID `gorm:"type:uuid;column:sumber_sesi_chat_id" json:"sumber_sesi_chat_id"`
+	SumberSesiChat   *SesiChatAI
+	Aktif            bool `gorm:"default:true;column:aktif" json:"aktif"`
 }
 
 func (MemoriChatbot) TableName() string { return "memori_chatbot" }

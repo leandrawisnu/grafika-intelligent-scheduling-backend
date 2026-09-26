@@ -7,7 +7,7 @@ API penjadwalan SMK Grafika (Go + Fiber + PostgreSQL). Entrypoint `src/main.go`,
 - Go 1.25+
 - PostgreSQL lokal (default `localhost:5432`) — Docker **opsional**
 
-Migrasi: `go run ./src -migrate …` atau `make migrate-*`.
+Migrasi dari folder `src`: `go run main.go -migrate` atau `make migrate-up`.
 
 ## Konfigurasi
 

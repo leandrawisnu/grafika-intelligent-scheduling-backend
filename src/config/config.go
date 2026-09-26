@@ -12,17 +12,20 @@ import (
 )
 
 type Config struct {
-	AppEnv       string
-	AppHost      string
-	AppPort      int
-	DBHost       string
-	DBUser       string
-	DBPassword   string
-	DBName       string
-	DBPort       int
-	databaseURL  string // set when DATABASE_URL provided explicitly
-	MLServiceURL string
-	AutoMigrate  bool
+	AppEnv        string
+	AppHost       string
+	AppPort       int
+	DBHost        string
+	DBUser        string
+	DBPassword    string
+	DBName        string
+	DBPort        int
+	databaseURL   string // set when DATABASE_URL provided explicitly
+	MLServiceURL  string
+	AutoMigrate   bool
+	CORSOrigins   string
+	AdminEmail    string
+	AdminPassword string
 }
 
 func Load() *Config {
@@ -46,17 +49,20 @@ func Load() *Config {
 	}
 
 	cfg := &Config{
-		AppEnv:       getEnv("APP_ENV", "local"),
-		AppHost:      getEnv("APP_HOST", "0.0.0.0"),
-		AppPort:      appPort,
-		DBHost:       getEnv("DB_HOST", "localhost"),
-		DBUser:       getEnv("DB_USER", "grafika"),
-		DBPassword:   getEnv("DB_PASSWORD", "grafika_dev"),
-		DBName:       getEnv("DB_NAME", "grafika"),
-		DBPort:       getEnvInt("DB_PORT", 5432),
-		databaseURL:  os.Getenv("DATABASE_URL"),
-		MLServiceURL: getEnv("ML_SERVICE_URL", "http://localhost:8000"),
-		AutoMigrate:  getEnvBool("GIS_AUTO_MIGRATE", false),
+		AppEnv:        getEnv("APP_ENV", "local"),
+		AppHost:       getEnv("APP_HOST", "0.0.0.0"),
+		AppPort:       appPort,
+		DBHost:        getEnv("DB_HOST", "localhost"),
+		DBUser:        getEnv("DB_USER", "grafika"),
+		DBPassword:    getEnv("DB_PASSWORD", "grafika_dev"),
+		DBName:        getEnv("DB_NAME", "grafika"),
+		DBPort:        getEnvInt("DB_PORT", 5432),
+		databaseURL:   os.Getenv("DATABASE_URL"),
+		MLServiceURL:  getEnv("ML_SERVICE_URL", "http://localhost:8000"),
+		AutoMigrate:   getEnvBool("GIS_AUTO_MIGRATE", false),
+		CORSOrigins:   getEnv("GIS_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"),
+		AdminEmail:    os.Getenv("GIS_ADMIN_EMAIL"),
+		AdminPassword: os.Getenv("GIS_ADMIN_PASSWORD"),
 	}
 	return cfg
 }
