@@ -4,18 +4,18 @@ import "encoding/json"
 
 // Validasi konflik
 type HasilValidasi struct {
-	JumlahKonflik int              `json:"jumlah_konflik"`
+	JumlahKonflik int                `json:"jumlah_konflik"`
 	Konflik       []RingkasanKonflik `json:"konflik"`
-	Bersih        bool             `json:"bersih"`
+	Bersih        bool               `json:"bersih"`
 }
 
 type RingkasanKonflik struct {
-	ID           string `json:"id"`
-	Tipe         string `json:"tipe_konflik"`
-	Keparahan    string `json:"tingkat_keparahan"`
-	Deskripsi    string `json:"deskripsi"`
-	Terselesaikan bool  `json:"terselesaikan"`
-	Terdeteksi   string `json:"terdeteksi_pada"`
+	ID            string `json:"id"`
+	Tipe          string `json:"tipe_konflik"`
+	Keparahan     string `json:"tingkat_keparahan"`
+	Deskripsi     string `json:"deskripsi"`
+	Terselesaikan bool   `json:"terselesaikan"`
+	Terdeteksi    string `json:"terdeteksi_pada"`
 }
 
 // Jadwal Semester
@@ -87,11 +87,11 @@ type SlotUntukML struct {
 }
 
 type GuruUntukML struct {
-	ID              string   `json:"id"`
-	Nama            string   `json:"nama"`
+	ID               string   `json:"id"`
+	Nama             string   `json:"nama"`
 	JamMaksPerMinggu float64  `json:"jam_maksimal_per_minggu"`
-	HariLibur       []string `json:"hari_libur"`
-	MataPelajaran   []string `json:"mata_pelajaran"`
+	HariLibur        []string `json:"hari_libur"`
+	MataPelajaran    []string `json:"mata_pelajaran"`
 }
 
 type HasilPrediksiML struct {
@@ -123,7 +123,7 @@ type MLAlternatif struct {
 }
 
 type MLQueryRequest struct {
-	Pertanyaan    string `json:"pertanyaan"`
+	Pertanyaan       string `json:"pertanyaan"`
 	JadwalSemesterID string `json:"jadwal_semester_id"`
 }
 
@@ -133,11 +133,15 @@ type MLQueryResponse struct {
 }
 
 type AIQueryRequest struct {
-	Pertanyaan    string `json:"pertanyaan"`
+	Pertanyaan       string `json:"pertanyaan"`
 	JadwalSemesterID string `json:"jadwal_semester_id"`
 }
 
 type AIQueryResponse struct {
 	Jawaban   string          `json:"jawaban"`
 	DataHasil json.RawMessage `json:"data_hasil"`
+}
+
+type SimpanImporRequest struct {
+	Baris []BuatSlotRequest `json:"baris"`
 }

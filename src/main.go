@@ -47,12 +47,13 @@ func main() {
 	if err := auth.NewLayanan(db).PastikanAdmin(cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		log.Fatalf("akun admin: %v", err)
 	}
-	if err := siapMinIO(cfg); err != nil {
+	objek, err := siapMinIO(cfg)
+	if err != nil {
 		log.Fatalf("minio: %v", err)
 	}
 	mlClient := mlclient.NewClient(cfg.MLServiceURL)
 
-	app := router.New(db, mlClient, cfg)
+	app := router.New(db, mlClient, objek, cfg)
 
 	log.Printf("Grafika Scheduling mendengarkan %s\n", cfg.ListenAddr())
 	if err := app.Listen(cfg.ListenAddr()); err != nil {
@@ -60,10 +61,10 @@ func main() {
 	}
 }
 
-func siapMinIO(cfg *config.Config) error {
+func siapMinIO(cfg *config.Config) (*storage.Client, error) {
 	if !cfg.MinIOConfigured() {
 		log.Printf("MinIO nonaktif (MINIO_ENDPOINT kosong)")
-		return nil
+		return nil, nil
 	}
 	klien, err := storage.New(storage.Options{
 		Endpoint:  cfg.MinIOEndpoint,
@@ -73,15 +74,15 @@ func siapMinIO(cfg *config.Config) error {
 		UseSSL:    cfg.MinIOUseSSL,
 	})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ctx, batal := context.WithTimeout(context.Background(), 15*time.Second)
 	defer batal()
 	if err := klien.EnsureBucket(ctx); err != nil {
-		return err
+		return nil, err
 	}
 	log.Printf("MinIO bucket %s siap", cfg.MinIOBucket)
-	return nil
+	return klien, nil
 }
 
 func runMigrateMode(dsn, command string, args []string) error {

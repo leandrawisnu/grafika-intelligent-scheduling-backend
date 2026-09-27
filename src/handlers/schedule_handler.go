@@ -7,6 +7,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/pkg/storage"
 	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/dto"
 	"github.com/grafika-scheduling/backend/src/models"
@@ -18,14 +19,16 @@ type PengelolaJadwal struct {
 	layananJadwal  *services.LayananJadwal
 	layananKonflik *services.LayananKonflik
 	mlClient       *mlclient.Client
+	objek          *storage.Client
 	db             *gorm.DB
 }
 
-func NewPengelolaJadwal(db *gorm.DB, mlClient *mlclient.Client) *PengelolaJadwal {
+func NewPengelolaJadwal(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client) *PengelolaJadwal {
 	return &PengelolaJadwal{
 		layananJadwal:  services.NewLayananJadwal(db),
 		layananKonflik: services.NewLayananKonflik(db),
 		mlClient:       mlClient,
+		objek:          objek,
 		db:             db,
 	}
 }
@@ -67,6 +70,10 @@ func (h *PengelolaJadwal) DaftarkanRute(r fiber.Router) {
 	r.Get("/jadwal-semester/:id/konflik", h.DaftarKonflik)
 	r.Post("/jadwal-semester/:id/validasi", h.Validasi)
 	r.Post("/jadwal-semester/:id/prediksi-konflik", h.PrediksiKonflik)
+
+	// Impor berkas jadwal
+	r.Post("/jadwal-semester/:id/impor/pratinjau", h.PratinjauImpor)
+	r.Post("/jadwal-semester/:id/impor", h.SimpanImpor)
 
 	// AI
 	r.Post("/konflik/:id/selesaikan", h.SelesaikanKonflik)

@@ -7,15 +7,17 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/pkg/storage"
 	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/config"
 	"github.com/grafika-scheduling/backend/src/handlers"
 	"gorm.io/gorm"
 )
 
-func New(db *gorm.DB, mlClient *mlclient.Client, cfg *config.Config) *fiber.App {
+func New(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, cfg *config.Config) *fiber.App {
 	app := fiber.New(fiber.Config{
-		AppName: "Grafika Scheduling",
+		AppName:   "Grafika Scheduling",
+		BodyLimit: 20 * 1024 * 1024,
 	})
 
 	app.Use(recover.New())
@@ -43,7 +45,7 @@ func New(db *gorm.DB, mlClient *mlclient.Client, cfg *config.Config) *fiber.App 
 	pengelolaMaster := handlers.NewPengelolaMaster(db)
 	pengelolaMaster.DaftarkanRute(v1)
 
-	pengelolaJadwal := handlers.NewPengelolaJadwal(db, mlClient)
+	pengelolaJadwal := handlers.NewPengelolaJadwal(db, mlClient, objek)
 	pengelolaJadwal.DaftarkanRute(v1)
 
 	return app

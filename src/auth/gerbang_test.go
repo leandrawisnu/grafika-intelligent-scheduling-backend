@@ -16,6 +16,8 @@ func TestGerbangKoor(t *testing.T) {
 		{"PUT", "/api/v1/slot/abc/tugaskan-guru", GerbangTolak},
 		{"POST", "/api/v1/tahun-ajaran", GerbangTolak},
 		{"POST", "/api/v1/jadwal-semester", GerbangTolak},
+		{"POST", "/api/v1/jadwal-semester/abc/impor/pratinjau", GerbangTolak},
+		{"POST", "/api/v1/jadwal-semester/abc/impor", GerbangTolak},
 		{"POST", "/api/v1/kelas", GerbangCekKelas},
 		{"PUT", "/api/v1/kelas/abc", GerbangCekKelas},
 		{"POST", "/api/v1/jadwal-semester/abc/jadwal-kelas", GerbangCekKelasBody},

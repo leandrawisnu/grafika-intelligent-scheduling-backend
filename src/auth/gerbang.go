@@ -40,7 +40,8 @@ func GerbangKoor(method, path string) string {
 		strings.Contains(p, "/mata-pelajaran"),
 		strings.Contains(p, "/ruangan"),
 		strings.Contains(p, "/jam-pelajaran"),
-		strings.Contains(p, "/guru"):
+		strings.Contains(p, "/guru"),
+		strings.Contains(p, "/impor"):
 		return GerbangTolak
 	case strings.Contains(p, "/jadwal-semester/") && strings.HasSuffix(strings.TrimRight(p, "/"), "/jurusan"):
 		return GerbangCekJurusanBody
