@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS dependency-stage
+FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS dependency-stage
 
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates
