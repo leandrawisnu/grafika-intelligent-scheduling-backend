@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
+	"github.com/grafika-scheduling/backend/pkg/storage"
 	"github.com/grafika-scheduling/backend/pkg/timezone"
 	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/config"
@@ -45,6 +47,9 @@ func main() {
 	if err := auth.NewLayanan(db).PastikanAdmin(cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		log.Fatalf("akun admin: %v", err)
 	}
+	if err := siapMinIO(cfg); err != nil {
+		log.Fatalf("minio: %v", err)
+	}
 	mlClient := mlclient.NewClient(cfg.MLServiceURL)
 
 	app := router.New(db, mlClient, cfg)
@@ -53,6 +58,30 @@ func main() {
 	if err := app.Listen(cfg.ListenAddr()); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func siapMinIO(cfg *config.Config) error {
+	if !cfg.MinIOConfigured() {
+		log.Printf("MinIO nonaktif (MINIO_ENDPOINT kosong)")
+		return nil
+	}
+	klien, err := storage.New(storage.Options{
+		Endpoint:  cfg.MinIOEndpoint,
+		AccessKey: cfg.MinIOAccessKey,
+		SecretKey: cfg.MinIOSecretKey,
+		Bucket:    cfg.MinIOBucket,
+		UseSSL:    cfg.MinIOUseSSL,
+	})
+	if err != nil {
+		return err
+	}
+	ctx, batal := context.WithTimeout(context.Background(), 15*time.Second)
+	defer batal()
+	if err := klien.EnsureBucket(ctx); err != nil {
+		return err
+	}
+	log.Printf("MinIO bucket %s siap", cfg.MinIOBucket)
+	return nil
 }
 
 func runMigrateMode(dsn, command string, args []string) error {

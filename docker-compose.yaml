@@ -33,6 +33,26 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: gis-backend-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-grafika}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-grafika_minio_dev}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - gis_backend_minio:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   backend:
     build:
       context: .
@@ -41,6 +61,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      minio:
         condition: service_healthy
     env_file:
       - .env
@@ -55,6 +77,11 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-grafika_dev}
       DB_NAME: ${DB_NAME:-grafika}
       ML_SERVICE_URL: ${ML_SERVICE_URL:-http://host.docker.internal:8000}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-grafika}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-grafika_minio_dev}
+      MINIO_BUCKET: ${MINIO_BUCKET:-gis}
+      MINIO_USE_SSL: "false"
       GIS_MODULE_ROOT: /app
       GIS_SKIP_MIGRATE: ${GIS_SKIP_MIGRATE:-false}
       TZ: ${TZ:-Asia/Jakarta}
@@ -73,3 +100,4 @@ services:
 
 volumes:
   gis_backend_pgdata:
+  gis_backend_minio:
