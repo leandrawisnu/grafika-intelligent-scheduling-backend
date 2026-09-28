@@ -478,37 +478,39 @@ func (h *PengelolaJadwal) SelesaikanKonflik(c *fiber.Ctx) error {
 		return c.Status(404).JSON(fiber.Map{"error": "konflik tidak ditemukan"})
 	}
 
-	js, _ := h.layananJadwal.AmbilJadwalSemester(konflik.JadwalSemesterID)
-
-	req := dto.MLResolveRequest{
-		KonflikID: konflikID.String(),
-		Konteks: mustMarshal(map[string]interface{}{
-			"konflik": map[string]interface{}{
-				"tipe":      konflik.TipeKonflik,
-				"deskripsi": konflik.Deskripsi,
-			},
-			"jadwal_kelas": js.JadwalKelas,
-		}),
+	usulan, err := h.layananKonflik.UsulkanPerbaikan(konflik)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	var hasil dto.MLResolveResponse
-	if err := h.mlClient.POST("/resolve/conflicts", req, &hasil); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Layanan ML tidak tersedia: " + err.Error()})
-	}
+	h.db.Where("konflik_id = ? AND diterima = ?", konflikID, false).Delete(&models.ResolusiAI{})
 
-	for _, alt := range hasil.Alternatif {
-		perubahanJSON, _ := json.Marshal(alt.Perubahan)
-		h.db.Create(&models.ResolusiAI{
+	alternatif := make([]fiber.Map, 0, len(usulan))
+	for _, u := range usulan {
+		perubahanJSON, err := json.Marshal(u.Perubahan)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "gagal menyimpan usulan"})
+		}
+		baris := models.ResolusiAI{
 			KonflikID:           konflikID,
 			JadwalSemesterID:    konflik.JadwalSemesterID,
-			Peringkat:           int16(alt.Peringkat),
-			SkorKeyakinan:       alt.Keyakinan,
+			Peringkat:           int16(u.Peringkat),
+			SkorKeyakinan:       u.Keyakinan,
 			UsulanPerubahanJSON: string(perubahanJSON),
-			Penjelasan:          alt.Penjelasan,
+			Penjelasan:          u.Penjelasan,
+		}
+		if err := h.db.Create(&baris).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "gagal menyimpan usulan"})
+		}
+		alternatif = append(alternatif, fiber.Map{
+			"id":         baris.ID.String(),
+			"peringkat":  u.Peringkat,
+			"label":      u.Label,
+			"penjelasan": u.Penjelasan,
 		})
 	}
 
-	return c.JSON(hasil)
+	return c.JSON(fiber.Map{"alternatif": alternatif})
 }
 
 func (h *PengelolaJadwal) DaftarResolusi(c *fiber.Ctx) error {
