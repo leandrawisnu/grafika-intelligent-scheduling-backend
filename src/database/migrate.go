@@ -143,7 +143,7 @@ func RunInitSQL(databaseURL string) error {
 
 func moduleRoot() (string, error) {
 	if dir := os.Getenv("GIS_MODULE_ROOT"); dir != "" {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		if moduleRootOK(dir) {
 			return dir, nil
 		}
 	}
@@ -176,4 +176,14 @@ func moduleRoot() (string, error) {
 		}
 		dir = parent
 	}
+}
+
+// moduleRootOK menerima root modul (ada go.mod) atau image production yang hanya
+// menyalin database/migrations ke GIS_MODULE_ROOT.
+func moduleRootOK(dir string) bool {
+	if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(dir, "database", "migrations"))
+	return err == nil && info.IsDir()
 }
