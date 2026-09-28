@@ -143,7 +143,9 @@ func RunInitSQL(databaseURL string) error {
 
 func moduleRoot() (string, error) {
 	if dir := os.Getenv("GIS_MODULE_ROOT"); dir != "" {
-		return dir, nil
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return dir, nil
+		}
 	}
 	dir, err := os.Getwd()
 	if err != nil {
