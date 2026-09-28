@@ -81,15 +81,25 @@ func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
 // Hari
 func (h *PengelolaMaster) DaftarHari(c *fiber.Ctx) error {
 	items := make([]models.Hari, 0)
-	err := h.db.Order("urutan_hari").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.Hari{}), &items, opsiDaftar{
+		defaultOrder: "urutan_hari",
+		searchCols:   []string{"nama"},
+		sortCols:     map[string]string{"nama": "nama", "urutan_hari": "urutan_hari"},
+	})
 }
 
 // Tahun Ajaran
 func (h *PengelolaMaster) DaftarTahunAjaran(c *fiber.Ctx) error {
 	items := make([]models.TahunAjaran, 0)
-	err := h.db.Order("created_at DESC").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.TahunAjaran{}), &items, opsiDaftar{
+		defaultOrder: "created_at DESC",
+		searchCols:   []string{"nama"},
+		sortCols: map[string]string{
+			"nama":            "nama",
+			"tanggal_mulai":   "tanggal_mulai",
+			"tanggal_selesai": "tanggal_selesai",
+		},
+	})
 }
 
 func (h *PengelolaMaster) BuatTahunAjaran(c *fiber.Ctx) error {
@@ -132,12 +142,22 @@ func (h *PengelolaMaster) HapusTahunAjaran(c *fiber.Ctx) error {
 // Semester
 func (h *PengelolaMaster) DaftarSemester(c *fiber.Ctx) error {
 	items := make([]models.Semester, 0)
-	q := h.db.Order("created_at DESC").Preload("TahunAjaran")
+	q := h.db.Model(&models.Semester{})
 	if ayID := c.Query("tahun_ajaran_id"); ayID != "" {
 		q = q.Where("tahun_ajaran_id = ?", ayID)
 	}
-	err := q.Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, q, &items, opsiDaftar{
+		defaultOrder: "created_at DESC",
+		searchCols:   []string{"nama"},
+		filterCols:   []string{"semester_ke"},
+		sortCols: map[string]string{
+			"nama":            "nama",
+			"semester_ke":     "semester_ke",
+			"tanggal_mulai":   "tanggal_mulai",
+			"tanggal_selesai": "tanggal_selesai",
+		},
+		preloads: []string{"TahunAjaran"},
+	})
 }
 
 func (h *PengelolaMaster) BuatSemester(c *fiber.Ctx) error {
@@ -180,12 +200,15 @@ func (h *PengelolaMaster) HapusSemester(c *fiber.Ctx) error {
 // Jurusan
 func (h *PengelolaMaster) DaftarJurusan(c *fiber.Ctx) error {
 	items := make([]models.Jurusan, 0)
-	q := h.db.Order("kode")
+	q := h.db.Model(&models.Jurusan{})
 	if id, ok := auth.Terbatas(c); ok {
 		q = q.Where("id = ?", id)
 	}
-	err := q.Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, q, &items, opsiDaftar{
+		defaultOrder: "kode",
+		searchCols:   []string{"kode", "nama"},
+		sortCols:     map[string]string{"kode": "kode", "nama": "nama"},
+	})
 }
 
 func (h *PengelolaMaster) BuatJurusan(c *fiber.Ctx) error {
@@ -229,8 +252,15 @@ func (h *PengelolaMaster) HapusJurusan(c *fiber.Ctx) error {
 // Guru
 func (h *PengelolaMaster) DaftarGuru(c *fiber.Ctx) error {
 	items := make([]models.Guru, 0)
-	err := h.db.Order("nama_lengkap").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.Guru{}), &items, opsiDaftar{
+		defaultOrder: "nama_lengkap",
+		searchCols:   []string{"nip", "nama_lengkap"},
+		sortCols: map[string]string{
+			"nip":                     "nip",
+			"nama_lengkap":            "nama_lengkap",
+			"jam_maksimal_per_minggu": "jam_maksimal_per_minggu",
+		},
+	})
 }
 
 func (h *PengelolaMaster) BuatGuru(c *fiber.Ctx) error {
@@ -295,8 +325,16 @@ func (h *PengelolaMaster) HapusHariLiburGuru(c *fiber.Ctx) error {
 // Mata Pelajaran
 func (h *PengelolaMaster) DaftarMataPelajaran(c *fiber.Ctx) error {
 	items := make([]models.MataPelajaran, 0)
-	err := h.db.Order("kode").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.MataPelajaran{}), &items, opsiDaftar{
+		defaultOrder: "kode",
+		searchCols:   []string{"kode", "nama"},
+		sortCols: map[string]string{
+			"kode":                 "kode",
+			"nama":                 "nama",
+			"jam_wajib_per_minggu": "jam_wajib_per_minggu",
+			"tingkat":              "tingkat",
+		},
+	})
 }
 
 func (h *PengelolaMaster) BuatMataPelajaran(c *fiber.Ctx) error {
@@ -337,15 +375,24 @@ func (h *PengelolaMaster) HapusMataPelajaran(c *fiber.Ctx) error {
 // Kelas
 func (h *PengelolaMaster) DaftarKelas(c *fiber.Ctx) error {
 	items := make([]models.Kelas, 0)
-	q := h.db.Order("kode").Preload("Jurusan").Preload("Semester")
+	q := h.db.Model(&models.Kelas{})
 	if semID := c.Query("semester_id"); semID != "" {
 		q = q.Where("semester_id = ?", semID)
 	}
 	if id, ok := auth.Terbatas(c); ok {
 		q = q.Where("jurusan_id = ?", id)
 	}
-	err := q.Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, q, &items, opsiDaftar{
+		defaultOrder: "kode",
+		searchCols:   []string{"kode", "nama"},
+		filterCols:   []string{"jurusan_id"},
+		sortCols: map[string]string{
+			"kode":    "kode",
+			"nama":    "nama",
+			"tingkat": "tingkat",
+		},
+		preloads: []string{"Jurusan", "Semester"},
+	})
 }
 
 func (h *PengelolaMaster) BuatKelas(c *fiber.Ctx) error {
@@ -404,8 +451,16 @@ func (h *PengelolaMaster) HapusKelas(c *fiber.Ctx) error {
 // Ruangan
 func (h *PengelolaMaster) DaftarRuangan(c *fiber.Ctx) error {
 	items := make([]models.Ruangan, 0)
-	err := h.db.Order("kode").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.Ruangan{}), &items, opsiDaftar{
+		defaultOrder: "kode",
+		searchCols:   []string{"kode", "nama", "tipe_ruangan"},
+		sortCols: map[string]string{
+			"kode":         "kode",
+			"nama":         "nama",
+			"kapasitas":    "kapasitas",
+			"tipe_ruangan": "tipe_ruangan",
+		},
+	})
 }
 
 func (h *PengelolaMaster) BuatRuangan(c *fiber.Ctx) error {
@@ -446,8 +501,15 @@ func (h *PengelolaMaster) HapusRuangan(c *fiber.Ctx) error {
 // Jam Pelajaran
 func (h *PengelolaMaster) DaftarJamPelajaran(c *fiber.Ctx) error {
 	items := make([]models.JamPelajaran, 0)
-	err := h.db.Order("jam_ke").Find(&items).Error
-	return listJSON(c, err, items)
+	return h.halaman(c, h.db.Model(&models.JamPelajaran{}), &items, opsiDaftar{
+		defaultOrder: "jam_ke",
+		searchCols:   []string{"jam_ke::text", "waktu_mulai::text", "waktu_selesai::text"},
+		sortCols: map[string]string{
+			"jam_ke":        "jam_ke",
+			"waktu_mulai":   "waktu_mulai",
+			"waktu_selesai": "waktu_selesai",
+		},
+	})
 }
 
 func (h *PengelolaMaster) BuatJamPelajaran(c *fiber.Ctx) error {

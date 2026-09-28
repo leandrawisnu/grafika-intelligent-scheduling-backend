@@ -146,9 +146,6 @@ func (h *PengelolaJadwal) jadwalDraf(c *fiber.Ctx) (*models.JadwalSemester, erro
 	if err != nil {
 		return nil, c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "jadwal tidak ditemukan"})
 	}
-	if js.Status == "dipublikasikan" {
-		return nil, c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": "Jadwal sudah dipublikasikan."})
-	}
 	return js, nil
 }
 
