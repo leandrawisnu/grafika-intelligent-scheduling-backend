@@ -16,6 +16,11 @@ for _ in $(seq 1 30); do
 done
 
 if ! ./main -migrate version >/tmp/gis-migrate-version 2>&1; then
+  if grep -Eq "go.mod tidak ditemukan|migrate instance" /tmp/gis-migrate-version; then
+    echo "Migrasi gagal sebelum menyentuh database." >&2
+    cat /tmp/gis-migrate-version >&2 || true
+    exit 1
+  fi
   echo "Database tidak dapat dihubungi setelah 60 detik." >&2
   cat /tmp/gis-migrate-version >&2 || true
   exit 1
