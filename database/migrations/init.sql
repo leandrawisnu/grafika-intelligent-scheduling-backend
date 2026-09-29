@@ -92,7 +92,7 @@ INSERT INTO hari (nama, urutan_hari, akhir_pekan) VALUES
     ('Rabu',     3, false),
     ('Kamis',    4, false),
     ('Jumat',    5, false),
-    ('Sabtu',    6, false),
+    ('Sabtu',    6, true),
     ('Minggu',   7, true);
 
 CREATE TABLE jam_pelajaran (

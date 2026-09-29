@@ -45,13 +45,6 @@ func (s *LayananJadwal) AmbilJadwalSemester(id uuid.UUID) (*models.JadwalSemeste
 			return db.Order("versi DESC")
 		}).
 		Preload("JadwalKelas.Kelas").
-		Preload("JadwalKelas.SlotJadwal").
-		Preload("JadwalKelas.SlotJadwal.Kelas").
-		Preload("JadwalKelas.SlotJadwal.MataPelajaran").
-		Preload("JadwalKelas.SlotJadwal.Hari").
-		Preload("JadwalKelas.SlotJadwal.JamPelajaran").
-		Preload("JadwalKelas.SlotJadwal.Ruangan").
-		Preload("JadwalKelas.SlotJadwal.Guru").
 		First(&js, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
@@ -144,7 +137,19 @@ func (s *LayananJadwal) AmbilJadwalKelas(id uuid.UUID) (*models.JadwalKelas, err
 	return &jk, nil
 }
 
-func (s *LayananJadwal) AmbilSemuaJadwalKelasAktif(jsID uuid.UUID) ([]models.JadwalKelas, error) {
+func (s *LayananJadwal) AmbilSemuaJadwalKelasAktif(jsID uuid.UUID, ringkas bool) ([]models.JadwalKelas, error) {
+	q := s.db.Where("jadwal_semester_id = ? AND is_active = ?", jsID, true).Preload("Kelas")
+	if !ringkas {
+		q = q.Preload("SlotJadwal")
+	}
+	var list []models.JadwalKelas
+	if err := q.Find(&list).Error; err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+func (s *LayananJadwal) AmbilSemuaJadwalKelasAktifLengkap(jsID uuid.UUID) ([]models.JadwalKelas, error) {
 	var list []models.JadwalKelas
 	if err := s.db.Where("jadwal_semester_id = ? AND is_active = ?", jsID, true).
 		Preload("Kelas").Preload("SlotJadwal").
