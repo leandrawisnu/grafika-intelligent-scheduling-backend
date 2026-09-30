@@ -512,10 +512,20 @@ func (h *PengelolaMaster) DaftarJamPelajaran(c *fiber.Ctx) error {
 	})
 }
 
+func tolakJamKe(c *fiber.Ctx, jamKe int16) error {
+	if jamKe < 0 || jamKe > 12 {
+		return c.Status(400).JSON(fiber.Map{"error": "Jam ke- harus 0 sampai 12"})
+	}
+	return nil
+}
+
 func (h *PengelolaMaster) BuatJamPelajaran(c *fiber.Ctx) error {
 	var item models.JamPelajaran
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
+	}
+	if err := tolakJamKe(c, item.JamKe); err != nil {
+		return err
 	}
 	h.db.Create(&item)
 	return c.Status(201).JSON(item)
@@ -536,7 +546,14 @@ func (h *PengelolaMaster) PerbaruiJamPelajaran(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	h.db.Model(&models.JamPelajaran{}).Where("id = ?", id).Updates(&item)
+	if err := tolakJamKe(c, item.JamKe); err != nil {
+		return err
+	}
+	h.db.Model(&models.JamPelajaran{}).Where("id = ?", id).Updates(map[string]any{
+		"jam_ke":        item.JamKe,
+		"waktu_mulai":   item.WaktuMulai,
+		"waktu_selesai": item.WaktuSelesai,
+	})
 	h.db.First(&item, "id = ?", id)
 	return c.JSON(item)
 }
