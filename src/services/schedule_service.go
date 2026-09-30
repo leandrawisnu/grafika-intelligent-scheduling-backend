@@ -118,9 +118,14 @@ func (s *LayananJadwal) BuatJadwalKelas(jsID, kelasID uuid.UUID) (*models.Jadwal
 
 	// Nonaktifkan versi lama
 	if versi > 1 {
-		s.db.Model(&models.JadwalKelas{}).
+		if err := s.db.Model(&models.JadwalKelas{}).
 			Where("jadwal_semester_id = ? AND kelas_id = ? AND id != ?", jsID, kelasID, jk.ID).
-			Update("is_active", false)
+			Update("is_active", false).Error; err != nil {
+			return nil, fmt.Errorf("gagal menonaktifkan jadwal kelas lama: %w", err)
+		}
+	}
+	if err := s.TandaiPerluValidasi(jsID); err != nil {
+		return nil, fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
 	}
 
 	return jk, nil
