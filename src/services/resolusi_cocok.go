@@ -44,6 +44,7 @@ func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok
 		Find(&slots).Error; err != nil {
 		return nil, fmt.Errorf("gagal memuat slot: %w", err)
 	}
+	slots = slotUntukUsulan(slots, konflik)
 
 	var guru []models.Guru
 	if err := s.db.Where("aktif = ?", true).Order("nama_lengkap").Find(&guru).Error; err != nil {
@@ -74,6 +75,51 @@ func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok
 		jam:   jam,
 		libur: indeksLibur,
 	}, konflik), nil
+}
+
+// slotUntukUsulan menyisakan slot yang bisa memengaruhi cocokkan: slot konflik
+// (termasuk milik GuruID untuk guru_kelebihan_jam) dan slot yang berbagi
+// hari+jam, guru, kelas, ruangan, atau mapel dengan slot konflik.
+func slotUntukUsulan(semua []models.SlotJadwal, konflik models.Konflik) []models.SlotJadwal {
+	inti := map[uuid.UUID]models.SlotJadwal{}
+	for _, s := range semua {
+		if idSama(s.ID, konflik.SlotAID) || idSama(s.ID, konflik.SlotBID) || idSama(s.GuruID, konflik.GuruID) {
+			inti[s.ID] = s
+		}
+	}
+	var out []models.SlotJadwal
+	for _, s := range semua {
+		if ikutUsulan(s, inti) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func ikutUsulan(s models.SlotJadwal, inti map[uuid.UUID]models.SlotJadwal) bool {
+	if _, ok := inti[s.ID]; ok {
+		return true
+	}
+	for _, k := range inti {
+		switch {
+		case kunciSama(s.HariID, k.HariID) && kunciSama(s.JamPelajaranID, k.JamPelajaranID),
+			kunciSama(s.GuruID, k.GuruID),
+			kunciSama(s.KelasID, k.KelasID),
+			kunciSama(s.RuanganID, k.RuanganID),
+			kunciSama(s.MataPelajaranID, k.MataPelajaranID):
+			return true
+		}
+	}
+	return false
+}
+
+func idSama(id uuid.UUID, ptr *uuid.UUID) bool {
+	return ptr != nil && kunciSama(id, *ptr)
+}
+
+// kunciSama menolak uuid.Nil agar slot tanpa guru/ruangan tidak saling cocok.
+func kunciSama(a, b uuid.UUID) bool {
+	return a != uuid.Nil && a == b
 }
 
 func cocokkan(k konteksCocok, konflik models.Konflik) []UsulanCocok {

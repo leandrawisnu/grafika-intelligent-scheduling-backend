@@ -123,6 +123,40 @@ func TestCocokkanRuanganDanJam(t *testing.T) {
 	}
 }
 
+func TestSlotUntukUsulanHanyaYangBerbagiKunci(t *testing.T) {
+	hari := uuid.New()
+	jam := uuid.New()
+	mapel := uuid.New()
+	guru := uuid.New()
+	terkait := uuid.New()
+	jamSama := uuid.New()
+	jauh := uuid.New()
+	semua := []models.SlotJadwal{
+		slotUji(terkait, guru, mapel, hari, jam, uuid.Nil, "Matematika", "Senin", 3),
+		slotUji(jamSama, uuid.New(), mapel, hari, jam, uuid.Nil, "Matematika", "Senin", 3),
+		slotUji(jauh, uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.Nil, "Lain", "Jumat", 8),
+	}
+	id := terkait
+	hasil := slotUntukUsulan(semua, models.Konflik{TipeKonflik: "guru_bentrok", SlotAID: &id, GuruID: &guru})
+	if len(hasil) != 2 {
+		t.Fatalf("len = %d, ingin 2 (slot konflik dan slot jam yang sama)", len(hasil))
+	}
+}
+
+func TestSlotUntukUsulanKelebihanJamMemakaiGuruKonflik(t *testing.T) {
+	guru := uuid.New()
+	milikGuru := uuid.New()
+	jauh := uuid.New()
+	semua := []models.SlotJadwal{
+		slotUji(milikGuru, guru, uuid.New(), uuid.New(), uuid.New(), uuid.Nil, "IPA", "Senin", 1),
+		slotUji(jauh, uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.Nil, "Lain", "Jumat", 8),
+	}
+	hasil := slotUntukUsulan(semua, models.Konflik{TipeKonflik: "guru_kelebihan_jam", GuruID: &guru})
+	if len(hasil) != 1 || hasil[0].ID != milikGuru {
+		t.Fatalf("hasil = %+v, ingin hanya slot milik guru konflik", hasil)
+	}
+}
+
 func slotUji(id, guru, mapel, hari, jam, ruang uuid.UUID, namaMapel, namaHari string, jamKe int16) models.SlotJadwal {
 	return models.SlotJadwal{
 		BaseModel:       models.BaseModel{ID: id},
