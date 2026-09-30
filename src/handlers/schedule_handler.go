@@ -37,6 +37,7 @@ func (h *PengelolaJadwal) DaftarkanRute(r fiber.Router) {
 	// Jadwal Semester
 	r.Post("/jadwal-semester", h.BuatJadwalSemester)
 	r.Get("/jadwal-semester", h.DaftarJadwalSemester)
+	r.Get("/jadwal-semester/:id/ringkasan", h.RingkasanJadwal)
 	r.Get("/jadwal-semester/:id", h.AmbilJadwalSemester)
 	r.Put("/jadwal-semester/:id/status", h.TransisiStatus)
 	r.Post("/jadwal-semester/:id/publikasi", h.Publikasi)
@@ -122,6 +123,30 @@ func (h *PengelolaJadwal) AmbilJadwalSemester(c *fiber.Ctx) error {
 	}
 	auth.SaringSemester(c, js)
 	return c.JSON(js)
+}
+
+func (h *PengelolaJadwal) RingkasanJadwal(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id jadwal tidak valid"})
+	}
+
+	var jumlah, tanpaGuru int64
+	dasarJumlah := h.db.Table("slot_jadwal").
+		Joins("JOIN jadwal_kelas ON jadwal_kelas.id = slot_jadwal.jadwal_kelas_id").
+		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", id, true)
+	if err := dasarJumlah.Count(&jumlah).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	dasarTanpaGuru := h.db.Table("slot_jadwal").
+		Joins("JOIN jadwal_kelas ON jadwal_kelas.id = slot_jadwal.jadwal_kelas_id").
+		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", id, true)
+	if err := dasarTanpaGuru.Where("slot_jadwal.guru_id IS NULL").Count(&tanpaGuru).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"jumlah_slot": jumlah, "jumlah_tanpa_guru": tanpaGuru})
 }
 
 func (h *PengelolaJadwal) TransisiStatus(c *fiber.Ctx) error {
