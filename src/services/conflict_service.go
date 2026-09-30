@@ -37,7 +37,9 @@ func (s *LayananKonflik) DeteksiKonflik(jsID uuid.UUID) ([]models.Konflik, error
 	konflik = append(konflik, s.cekGuruHariLibur(jsID, slots)...)
 
 	// Hapus konflik lama dan simpan yang baru
-	s.db.Where("jadwal_semester_id = ?", jsID).Delete(&models.Konflik{})
+	if err := s.db.Where("jadwal_semester_id = ?", jsID).Delete(&models.Konflik{}).Error; err != nil {
+		return nil, fmt.Errorf("gagal menghapus konflik lama: %w", err)
+	}
 	if len(konflik) > 0 {
 		if err := s.db.Create(&konflik).Error; err != nil {
 			return nil, fmt.Errorf("gagal menyimpan konflik: %w", err)
@@ -46,8 +48,14 @@ func (s *LayananKonflik) DeteksiKonflik(jsID uuid.UUID) ([]models.Konflik, error
 
 	// Perbarui status bebas konflik
 	bebasKonflik := len(konflik) == 0
-	s.db.Model(&models.JadwalSemester{}).Where("id = ?", jsID).
-		Update("bebas_konflik", bebasKonflik)
+	if err := s.db.Model(&models.JadwalSemester{}).Where("id = ?", jsID).
+		Update("bebas_konflik", bebasKonflik).Error; err != nil {
+		return nil, fmt.Errorf("gagal memperbarui status konflik: %w", err)
+	}
+	if err := s.db.Model(&models.JadwalSemester{}).Where("id = ?", jsID).
+		Update("perlu_validasi", false).Error; err != nil {
+		return nil, fmt.Errorf("gagal memperbarui status validasi: %w", err)
+	}
 
 	return konflik, nil
 }
@@ -98,7 +106,7 @@ func (s *LayananKonflik) cekRuanganBentrok(jsID uuid.UUID, slots []models.SlotJa
 	var konflik []models.Konflik
 	type kunci struct {
 		RuanganID, HariID, JamPelajaranID string
-		Minggu                             int16
+		Minggu                            int16
 	}
 	terlihat := make(map[kunci][]models.SlotJadwal)
 
@@ -139,7 +147,7 @@ func (s *LayananKonflik) cekKelasBentrok(jsID uuid.UUID, slots []models.SlotJadw
 	var konflik []models.Konflik
 	type kunci struct {
 		KelasID, HariID, JamPelajaranID string
-		Minggu                           int16
+		Minggu                          int16
 	}
 	terlihat := make(map[kunci][]models.SlotJadwal)
 

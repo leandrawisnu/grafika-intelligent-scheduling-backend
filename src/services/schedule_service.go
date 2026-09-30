@@ -56,7 +56,7 @@ func (s *LayananJadwal) TambahJurusanKeSemester(id uuid.UUID, jurusanIDs []strin
 		jurID, _ := uuid.Parse(jid)
 		s.db.FirstOrCreate(&models.JadwalSemesterJurusan{}, map[string]interface{}{
 			"jadwal_semester_id": id,
-			"jurusan_id":        jurID,
+			"jurusan_id":         jurID,
 		})
 	}
 	return nil
@@ -164,10 +164,39 @@ func (s *LayananJadwal) AmbilSemuaJadwalKelasAktifLengkap(jsID uuid.UUID) ([]mod
 
 // ========== Slot ==========
 
+func (s *LayananJadwal) TandaiPerluValidasi(jsID uuid.UUID) error {
+	return s.db.Model(&models.JadwalSemester{}).
+		Where("id = ?", jsID).
+		Update("perlu_validasi", true).Error
+}
+
+func (s *LayananJadwal) tandaiPerluValidasiDariJadwalKelas(jkID uuid.UUID) error {
+	var jk models.JadwalKelas
+	if err := s.db.Select("jadwal_semester_id").First(&jk, "id = ?", jkID).Error; err != nil {
+		return err
+	}
+	return s.TandaiPerluValidasi(jk.JadwalSemesterID)
+}
+
+func (s *LayananJadwal) jadwalSemesterIDUntukSlot(slotID uuid.UUID) (uuid.UUID, error) {
+	var slot models.SlotJadwal
+	if err := s.db.Select("jadwal_kelas_id").First(&slot, "id = ?", slotID).Error; err != nil {
+		return uuid.Nil, err
+	}
+	var jk models.JadwalKelas
+	if err := s.db.Select("jadwal_semester_id").First(&jk, "id = ?", slot.JadwalKelasID).Error; err != nil {
+		return uuid.Nil, err
+	}
+	return jk.JadwalSemesterID, nil
+}
+
 func (s *LayananJadwal) TambahSlot(jkID uuid.UUID, slot *models.SlotJadwal) (*models.SlotJadwal, error) {
 	slot.JadwalKelasID = jkID
 	if err := s.db.Create(slot).Error; err != nil {
 		return nil, fmt.Errorf("gagal tambah slot: %w", err)
+	}
+	if err := s.tandaiPerluValidasiDariJadwalKelas(jkID); err != nil {
+		return nil, fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
 	}
 	return slot, nil
 }
@@ -179,6 +208,9 @@ func (s *LayananJadwal) TambahSlotBulk(jkID uuid.UUID, slots []models.SlotJadwal
 	if err := s.db.Create(&slots).Error; err != nil {
 		return nil, fmt.Errorf("gagal tambah slot massal: %w", err)
 	}
+	if err := s.tandaiPerluValidasiDariJadwalKelas(jkID); err != nil {
+		return nil, fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
+	}
 	return slots, nil
 }
 
@@ -186,13 +218,30 @@ func (s *LayananJadwal) PerbaruiSlot(slotID uuid.UUID, data map[string]interface
 	if err := s.db.Model(&models.SlotJadwal{}).Where("id = ?", slotID).Updates(data).Error; err != nil {
 		return nil, fmt.Errorf("gagal perbarui slot: %w", err)
 	}
+	jsID, err := s.jadwalSemesterIDUntukSlot(slotID)
+	if err != nil {
+		return nil, fmt.Errorf("gagal menemukan jadwal semester slot: %w", err)
+	}
+	if err := s.TandaiPerluValidasi(jsID); err != nil {
+		return nil, fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
+	}
 	var slot models.SlotJadwal
 	s.db.First(&slot, "id = ?", slotID)
 	return &slot, nil
 }
 
 func (s *LayananJadwal) HapusSlot(slotID uuid.UUID) error {
-	return s.db.Delete(&models.SlotJadwal{}, "id = ?", slotID).Error
+	jsID, err := s.jadwalSemesterIDUntukSlot(slotID)
+	if err != nil {
+		return fmt.Errorf("gagal menemukan jadwal semester slot: %w", err)
+	}
+	if err := s.db.Delete(&models.SlotJadwal{}, "id = ?", slotID).Error; err != nil {
+		return err
+	}
+	if err := s.TandaiPerluValidasi(jsID); err != nil {
+		return fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
+	}
+	return nil
 }
 
 // ========== Penempatan Guru ==========
@@ -214,6 +263,13 @@ func (s *LayananJadwal) TugaskanGuru(slotID, guruID uuid.UUID) (*models.SlotJadw
 		Update("guru_id", guruID).Error; err != nil {
 		return nil, fmt.Errorf("gagal tugaskan guru: %w", err)
 	}
+	jsID, err := s.jadwalSemesterIDUntukSlot(slotID)
+	if err != nil {
+		return nil, fmt.Errorf("gagal menemukan jadwal semester slot: %w", err)
+	}
+	if err := s.TandaiPerluValidasi(jsID); err != nil {
+		return nil, fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
+	}
 	var slot models.SlotJadwal
 	s.db.Preload("Guru").First(&slot, "id = ?", slotID)
 	return &slot, nil
@@ -223,7 +279,12 @@ func (s *LayananJadwal) TugaskanBulk(jsID uuid.UUID, tugas map[string]string) er
 	for slotID, guruID := range tugas {
 		sID, _ := uuid.Parse(slotID)
 		gID, _ := uuid.Parse(guruID)
-		s.db.Model(&models.SlotJadwal{}).Where("id = ?", sID).Update("guru_id", gID)
+		if err := s.db.Model(&models.SlotJadwal{}).Where("id = ?", sID).Update("guru_id", gID).Error; err != nil {
+			return fmt.Errorf("gagal tugaskan guru: %w", err)
+		}
+	}
+	if err := s.TandaiPerluValidasi(jsID); err != nil {
+		return fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
 	}
 	return nil
 }
