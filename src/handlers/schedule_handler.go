@@ -215,7 +215,8 @@ func (h *PengelolaJadwal) AmbilJadwalKelas(c *fiber.Ctx) error {
 
 func (h *PengelolaJadwal) SemuaJadwalKelasAktif(c *fiber.Ctx) error {
 	jsID, _ := uuid.Parse(c.Params("id"))
-	list, err := h.layananJadwal.AmbilSemuaJadwalKelasAktif(jsID)
+	ringkas := c.Query("ringkas") == "1"
+	list, err := h.layananJadwal.AmbilSemuaJadwalKelasAktif(jsID, ringkas)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
@@ -393,7 +394,7 @@ func (h *PengelolaJadwal) Validasi(c *fiber.Ctx) error {
 func (h *PengelolaJadwal) PrediksiKonflik(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 
-	jadwalKelas, err := h.layananJadwal.AmbilSemuaJadwalKelasAktif(id)
+	jadwalKelas, err := h.layananJadwal.AmbilSemuaJadwalKelasAktifLengkap(id)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
