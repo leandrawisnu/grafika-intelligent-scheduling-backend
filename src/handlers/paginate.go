@@ -9,6 +9,17 @@ import (
 
 const ukuranHalaman = 10
 
+func ukuranDariQuery(c *fiber.Ctx) int {
+	switch c.QueryInt("per_page", ukuranHalaman) {
+	case 50:
+		return 50
+	case 100:
+		return 100
+	default:
+		return ukuranHalaman
+	}
+}
+
 type opsiDaftar struct {
 	defaultOrder string
 	searchCols   []string
@@ -51,7 +62,8 @@ func (h *PengelolaMaster) halaman(c *fiber.Ctx, base *gorm.DB, dest any, opt ops
 	for _, nama := range opt.preloads {
 		q = q.Preload(nama)
 	}
-	if err := q.Limit(ukuranHalaman).Offset((page - 1) * ukuranHalaman).Find(dest).Error; err != nil {
+	ukuran := ukuranDariQuery(c)
+	if err := q.Limit(ukuran).Offset((page - 1) * ukuran).Find(dest).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
@@ -59,7 +71,7 @@ func (h *PengelolaMaster) halaman(c *fiber.Ctx, base *gorm.DB, dest any, opt ops
 		"data":     dest,
 		"total":    total,
 		"page":     page,
-		"per_page": ukuranHalaman,
+		"per_page": ukuran,
 	})
 }
 
