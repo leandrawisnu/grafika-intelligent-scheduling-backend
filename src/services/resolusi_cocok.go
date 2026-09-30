@@ -92,12 +92,14 @@ func hitungJamGuru(slots []models.SlotJadwal) map[uuid.UUID]float64 {
 }
 
 // slotUntukUsulan menyisakan slot yang bisa memengaruhi cocokkan: slot konflik
-// (termasuk milik GuruID untuk guru_kelebihan_jam) dan slot yang berbagi
-// hari+jam, guru, kelas, ruangan, atau mapel dengan slot konflik.
+// dan slot yang berbagi hari+jam, guru, kelas, ruangan, atau mapel dengan slot
+// konflik. Semua slot GuruID menjadi inti hanya bila konflik tidak punya slot
+// (guru_kelebihan_jam); bila tidak, inti melebar hari+jam ke hampir seluruh semester.
 func slotUntukUsulan(semua []models.SlotJadwal, konflik models.Konflik) []models.SlotJadwal {
+	intiDariGuru := konflik.SlotAID == nil && konflik.SlotBID == nil
 	inti := map[uuid.UUID]models.SlotJadwal{}
 	for _, s := range semua {
-		if idSama(s.ID, konflik.SlotAID) || idSama(s.ID, konflik.SlotBID) || idSama(s.GuruID, konflik.GuruID) {
+		if idSama(s.ID, konflik.SlotAID) || idSama(s.ID, konflik.SlotBID) || (intiDariGuru && idSama(s.GuruID, konflik.GuruID)) {
 			inti[s.ID] = s
 		}
 	}

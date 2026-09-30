@@ -175,6 +175,14 @@ func (s *LayananJadwal) TandaiPerluValidasi(jsID uuid.UUID) error {
 		Update("perlu_validasi", true).Error
 }
 
+// TandaiSemuaPerluValidasi dipakai saat data guru (hari libur, jam maksimal)
+// berubah, karena data itu dibaca DeteksiKonflik di setiap semester.
+func TandaiSemuaPerluValidasi(db *gorm.DB) error {
+	return db.Model(&models.JadwalSemester{}).
+		Where("perlu_validasi = ?", false).
+		Update("perlu_validasi", true).Error
+}
+
 func (s *LayananJadwal) tandaiPerluValidasiDariJadwalKelas(jkID uuid.UUID) error {
 	var jk models.JadwalKelas
 	if err := s.db.Select("jadwal_semester_id").First(&jk, "id = ?", jkID).Error; err != nil {

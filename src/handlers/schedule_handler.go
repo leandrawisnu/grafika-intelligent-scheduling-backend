@@ -418,7 +418,9 @@ func (h *PengelolaJadwal) Validasi(c *fiber.Ctx) error {
 	}
 	if !js.PerluValidasi {
 		var ada []models.Konflik
-		h.db.Where("jadwal_semester_id = ?", id).Find(&ada)
+		if err := h.db.Where("jadwal_semester_id = ?", id).Find(&ada).Error; err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 		return c.JSON(dto.HasilValidasi{
 			JumlahKonflik: len(ada),
 			Konflik:       ringkasKonflik(ada),
