@@ -135,13 +135,16 @@ func (h *PengelolaJadwal) RingkasanJadwal(c *fiber.Ctx) error {
 	dasarJumlah := h.db.Table("slot_jadwal").
 		Joins("JOIN jadwal_kelas ON jadwal_kelas.id = slot_jadwal.jadwal_kelas_id").
 		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", id, true)
-	if err := dasarJumlah.Count(&jumlah).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
 	dasarTanpaGuru := h.db.Table("slot_jadwal").
 		Joins("JOIN jadwal_kelas ON jadwal_kelas.id = slot_jadwal.jadwal_kelas_id").
 		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", id, true)
+	if terbatas, ok := auth.Terbatas(c); ok {
+		dasarJumlah = dasarJumlah.Where("jadwal_kelas.jurusan_id = ?", terbatas)
+		dasarTanpaGuru = dasarTanpaGuru.Where("jadwal_kelas.jurusan_id = ?", terbatas)
+	}
+	if err := dasarJumlah.Count(&jumlah).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	if err := dasarTanpaGuru.Where("slot_jadwal.guru_id IS NULL").Count(&tanpaGuru).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
