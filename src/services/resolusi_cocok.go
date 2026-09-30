@@ -33,6 +33,8 @@ type konteksCocok struct {
 	ruang []models.Ruangan
 	jam   []models.JamPelajaran
 	libur map[string]bool
+	// jamGuru dihitung dari semua slot semester sebelum disaring; nil berarti hitung dari slots.
+	jamGuru map[uuid.UUID]float64
 }
 
 func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok, error) {
@@ -44,7 +46,6 @@ func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok
 		Find(&slots).Error; err != nil {
 		return nil, fmt.Errorf("gagal memuat slot: %w", err)
 	}
-	slots = slotUntukUsulan(slots, konflik)
 
 	var guru []models.Guru
 	if err := s.db.Where("aktif = ?", true).Order("nama_lengkap").Find(&guru).Error; err != nil {
@@ -68,13 +69,26 @@ func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok
 		indeksLibur[h.GuruID.String()+"|"+h.HariID.String()] = true
 	}
 
-	return cocokkan(konteksCocok{
-		slots: slots,
-		guru:  guru,
-		ruang: ruang,
-		jam:   jam,
-		libur: indeksLibur,
-	}, konflik), nil
+	return cocokkan(susunKonteksUsulan(slots, konflik, guru, ruang, jam, indeksLibur), konflik), nil
+}
+
+func susunKonteksUsulan(semua []models.SlotJadwal, konflik models.Konflik, guru []models.Guru, ruang []models.Ruangan, jam []models.JamPelajaran, libur map[string]bool) konteksCocok {
+	return konteksCocok{
+		slots:   slotUntukUsulan(semua, konflik),
+		guru:    guru,
+		ruang:   ruang,
+		jam:     jam,
+		libur:   libur,
+		jamGuru: hitungJamGuru(semua),
+	}
+}
+
+func hitungJamGuru(slots []models.SlotJadwal) map[uuid.UUID]float64 {
+	out := make(map[uuid.UUID]float64)
+	for _, slot := range slots {
+		out[slot.GuruID]++
+	}
+	return out
 }
 
 // slotUntukUsulan menyisakan slot yang bisa memengaruhi cocokkan: slot konflik
@@ -348,6 +362,9 @@ func (k konteksCocok) sibukKelas(kelasID, hariID, jamID uuid.UUID, minggu int16,
 }
 
 func (k konteksCocok) jamMinggu(guruID uuid.UUID) float64 {
+	if k.jamGuru != nil {
+		return k.jamGuru[guruID]
+	}
 	var n float64
 	for _, slot := range k.slots {
 		if slot.GuruID == guruID {

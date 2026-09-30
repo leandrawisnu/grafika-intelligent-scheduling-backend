@@ -157,6 +157,36 @@ func TestSlotUntukUsulanKelebihanJamMemakaiGuruKonflik(t *testing.T) {
 	}
 }
 
+func TestUsulanTidakMenyarankanGuruPenuhYangSlotnyaTersaring(t *testing.T) {
+	hari := uuid.New()
+	jam := uuid.New()
+	guruA := uuid.New()
+	penuh := uuid.New()
+	bebas := uuid.New()
+	slotB := uuid.New()
+	slotPenuh := uuid.New()
+
+	semua := []models.SlotJadwal{
+		slotUji(slotB, guruA, uuid.New(), hari, jam, uuid.Nil, "Bahasa", "Senin", 2),
+		slotUji(slotPenuh, penuh, uuid.New(), uuid.New(), uuid.New(), uuid.Nil, "Lain", "Rabu", 5),
+	}
+	guru := []models.Guru{
+		{BaseModel: models.BaseModel{ID: penuh}, NamaLengkap: "Penuh", JamMaksimalPerMinggu: 1, Aktif: true},
+		{BaseModel: models.BaseModel{ID: bebas}, NamaLengkap: "Bebas", JamMaksimalPerMinggu: 10, Aktif: true},
+	}
+	idB := slotB
+	konflik := models.Konflik{TipeKonflik: "guru_hari_libur", SlotAID: &idB}
+
+	k := susunKonteksUsulan(semua, konflik, guru, nil, nil, map[string]bool{})
+	if k.slotDariID(&slotPenuh) != nil {
+		t.Fatal("slot guru Penuh seharusnya tersaring agar tes ini bermakna")
+	}
+	usulan := cocokkan(k, konflik)
+	if len(usulan) != 1 || usulan[0].Label != "Pindah ke Bebas" {
+		t.Fatalf("usulan = %+v, guru yang sudah mencapai jam maksimal tidak boleh disarankan", usulan)
+	}
+}
+
 func slotUji(id, guru, mapel, hari, jam, ruang uuid.UUID, namaMapel, namaHari string, jamKe int16) models.SlotJadwal {
 	return models.SlotJadwal{
 		BaseModel:       models.BaseModel{ID: id},
