@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/compress"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/grafika-scheduling/backend/pkg/mlclient"
@@ -21,6 +22,16 @@ func New(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, cfg *con
 	})
 
 	app.Use(recover.New())
+	// fasthttp menghapus ETag saat men-gzip. Salin ulang setelah kompresi.
+	app.Use(func(c *fiber.Ctx) error {
+		err := c.Next()
+		if tag := c.GetRespHeader("X-GIS-ETag"); tag != "" {
+			c.Set("ETag", tag)
+			c.Response().Header.Del("X-GIS-ETag")
+		}
+		return err
+	})
+	app.Use(compress.New(compress.Config{Level: compress.LevelBestSpeed}))
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     originsBersih(cfg.CORSOrigins),
 		AllowMethods:     "GET,POST,PUT,DELETE,OPTIONS",
