@@ -28,6 +28,7 @@ type Layanan struct {
 	db         *gorm.DB
 	pembatas   *Pembatas
 	hashKosong string
+	cacheSesi  *cacheSesi
 }
 
 func NewLayanan(db *gorm.DB) *Layanan {
@@ -37,7 +38,12 @@ func NewLayanan(db *gorm.DB) *Layanan {
 	if err != nil {
 		log.Fatalf("hash dummy: %v", err)
 	}
-	return &Layanan{db: db, pembatas: BaruPembatas(8, 15*time.Minute), hashKosong: hash}
+	return &Layanan{
+		db:         db,
+		pembatas:   BaruPembatas(8, 15*time.Minute),
+		hashKosong: hash,
+		cacheSesi:  baruCacheSesi(),
+	}
 }
 
 func (l *Layanan) Masuk(ip, email, sandi string) (string, models.Pengguna, error) {
@@ -88,21 +94,33 @@ func (l *Layanan) PenggunaDariToken(token string) (models.Pengguna, error) {
 	if token == "" {
 		return models.Pengguna{}, ErrSesi
 	}
+	hash := HashToken(token)
+	if akun, ok := l.cacheSesi.ambil(hash); ok {
+		return akun, nil
+	}
 	var sesi models.Sesi
 	err := l.db.Preload("Pengguna").
-		Where("token_hash = ? AND kedaluwarsa > ?", HashToken(token), time.Now()).
+		Where("token_hash = ? AND kedaluwarsa > ?", hash, time.Now()).
 		First(&sesi).Error
 	if err != nil || sesi.Pengguna == nil || !sesi.Pengguna.Aktif {
 		return models.Pengguna{}, ErrSesi
 	}
-	return *sesi.Pengguna, nil
+	akun := *sesi.Pengguna
+	batas := time.Now().Add(tahanSesiCache)
+	if sesi.Kedaluwarsa.Before(batas) {
+		batas = sesi.Kedaluwarsa
+	}
+	l.cacheSesi.simpan(hash, akun, batas)
+	return akun, nil
 }
 
 func (l *Layanan) HapusToken(token string) {
 	if token == "" {
 		return
 	}
-	l.db.Where("token_hash = ?", HashToken(token)).Delete(&models.Sesi{})
+	hash := HashToken(token)
+	l.cacheSesi.hapus(hash)
+	l.db.Where("token_hash = ?", hash).Delete(&models.Sesi{})
 }
 
 func (l *Layanan) PastikanAdmin(email, sandi string) error {

@@ -2,6 +2,7 @@ package database
 
 import (
 	"log"
+	"time"
 
 	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/driver/postgres"
@@ -16,6 +17,15 @@ func Connect(dsn string) *gorm.DB {
 	if err != nil {
 		log.Fatalf("Gagal terhubung ke database: %v", err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("Gagal mengambil pool database: %v", err)
+	}
+	// Batas pool mencegah 50 VU membuka koneksi tanpa batas (Postgres memutus, klien dapat EOF).
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(30 * time.Minute)
+	sqlDB.SetConnMaxIdleTime(5 * time.Minute)
 	return db
 }
 
