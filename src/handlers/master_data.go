@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"sync"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/grafika-scheduling/backend/src/auth"
@@ -17,6 +19,85 @@ func NewPengelolaMaster(db *gorm.DB) *PengelolaMaster {
 	return &PengelolaMaster{db: db}
 }
 
+func (h *PengelolaMaster) Katalog(c *fiber.Ctx) error {
+	var (
+		hari    []models.Hari
+		jam     []models.JamPelajaran
+		kelas   []models.Kelas
+		guru    []models.Guru
+		mapel   []models.MataPelajaran
+		ruangan []models.Ruangan
+		jurusan []models.Jurusan
+		mu      sync.Mutex
+		gagal   error
+		wg      sync.WaitGroup
+	)
+	jalan := func(fn func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(); err != nil {
+				mu.Lock()
+				if gagal == nil {
+					gagal = err
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	terbatas, terbatasOK := auth.Terbatas(c)
+
+	jalan(func() error {
+		hari = make([]models.Hari, 0)
+		return h.db.Order("urutan_hari").Find(&hari).Error
+	})
+	jalan(func() error {
+		jam = make([]models.JamPelajaran, 0)
+		return h.db.Order("jam_ke").Find(&jam).Error
+	})
+	jalan(func() error {
+		kelas = make([]models.Kelas, 0)
+		q := h.db.Model(&models.Kelas{}).Order("kode").Preload("Jurusan").Preload("Semester")
+		if terbatasOK {
+			q = q.Where("jurusan_id = ?", terbatas)
+		}
+		return q.Find(&kelas).Error
+	})
+	jalan(func() error {
+		guru = make([]models.Guru, 0)
+		return h.db.Order("nama_lengkap").Find(&guru).Error
+	})
+	jalan(func() error {
+		mapel = make([]models.MataPelajaran, 0)
+		return h.db.Order("kode").Find(&mapel).Error
+	})
+	jalan(func() error {
+		ruangan = make([]models.Ruangan, 0)
+		return h.db.Order("kode").Find(&ruangan).Error
+	})
+	jalan(func() error {
+		jurusan = make([]models.Jurusan, 0)
+		q := h.db.Model(&models.Jurusan{}).Order("kode")
+		if terbatasOK {
+			q = q.Where("id = ?", terbatas)
+		}
+		return q.Find(&jurusan).Error
+	})
+	wg.Wait()
+	if gagal != nil {
+		return c.Status(500).JSON(fiber.Map{"error": gagal.Error()})
+	}
+	return c.JSON(fiber.Map{
+		"hari":           hari,
+		"jam_pelajaran":  jam,
+		"kelas":          kelas,
+		"guru":           guru,
+		"mata_pelajaran": mapel,
+		"ruangan":        ruangan,
+		"jurusan":        jurusan,
+	})
+}
+
 func listJSON(c *fiber.Ctx, err error, items interface{}) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -25,6 +106,7 @@ func listJSON(c *fiber.Ctx, err error, items interface{}) error {
 }
 
 func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
+	r.Get("/katalog", h.Katalog)
 	r.Get("/hari", h.DaftarHari)
 
 	r.Get("/tahun-ajaran", h.DaftarTahunAjaran)

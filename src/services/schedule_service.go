@@ -41,10 +41,6 @@ func (s *LayananJadwal) AmbilJadwalSemester(id uuid.UUID) (*models.JadwalSemeste
 	var js models.JadwalSemester
 	if err := s.db.Preload("Semester.TahunAjaran").
 		Preload("Jurusan.Jurusan").
-		Preload("JadwalKelas", func(db *gorm.DB) *gorm.DB {
-			return db.Order("versi DESC")
-		}).
-		Preload("JadwalKelas.Kelas").
 		First(&js, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
