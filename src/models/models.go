@@ -160,12 +160,14 @@ func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
 // Master jadwal per semester
 type JadwalSemester struct {
 	BaseModel
-	SemesterID   uuid.UUID               `gorm:"not null;column:semester_id" json:"semester_id"`
-	Semester     *Semester               `json:"semester,omitempty"`
-	Status       string                  `gorm:"not null;default:draf;column:status;size:20" json:"status"`
-	BebasKonflik bool                    `gorm:"default:false;column:bebas_konflik" json:"bebas_konflik"`
-	Jurusan      []JadwalSemesterJurusan `gorm:"foreignKey:JadwalSemesterID" json:"jurusan,omitempty"`
-	JadwalKelas  []JadwalKelas           `gorm:"foreignKey:JadwalSemesterID" json:"jadwal_kelas,omitempty"`
+	SemesterID      uuid.UUID               `gorm:"not null;column:semester_id" json:"semester_id"`
+	Semester        *Semester               `json:"semester,omitempty"`
+	Status          string                  `gorm:"not null;default:draf;column:status;size:20" json:"status"`
+	BebasKonflik    bool                    `gorm:"default:false;column:bebas_konflik" json:"bebas_konflik"`
+	PerluValidasi   bool                    `gorm:"not null;default:true;column:perlu_validasi" json:"perlu_validasi"`
+	PunyaKelasAktif bool                    `gorm:"-" json:"punya_kelas_aktif"`
+	Jurusan         []JadwalSemesterJurusan `gorm:"foreignKey:JadwalSemesterID" json:"jurusan,omitempty"`
+	JadwalKelas     []JadwalKelas           `gorm:"foreignKey:JadwalSemesterID" json:"jadwal_kelas,omitempty"`
 }
 
 func (JadwalSemester) TableName() string { return "jadwal_semester" }

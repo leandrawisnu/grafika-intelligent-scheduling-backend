@@ -165,6 +165,9 @@ func (s *LayananJadwal) SimpanImpor(jsID, semesterID uuid.UUID, baris []BarisImp
 		if jumlah == 0 {
 			return fmt.Errorf("tidak ada baris baru untuk disimpan")
 		}
+		if err := dalam.TandaiPerluValidasi(jsID); err != nil {
+			return fmt.Errorf("gagal tandai jadwal perlu validasi: %w", err)
+		}
 		return nil
 	})
 	if err != nil {

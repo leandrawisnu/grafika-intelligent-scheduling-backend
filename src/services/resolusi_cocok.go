@@ -33,6 +33,8 @@ type konteksCocok struct {
 	ruang []models.Ruangan
 	jam   []models.JamPelajaran
 	libur map[string]bool
+	// jamGuru dihitung dari semua slot semester sebelum disaring; nil berarti hitung dari slots.
+	jamGuru map[uuid.UUID]float64
 }
 
 func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok, error) {
@@ -67,13 +69,73 @@ func (s *LayananKonflik) UsulkanPerbaikan(konflik models.Konflik) ([]UsulanCocok
 		indeksLibur[h.GuruID.String()+"|"+h.HariID.String()] = true
 	}
 
-	return cocokkan(konteksCocok{
-		slots: slots,
-		guru:  guru,
-		ruang: ruang,
-		jam:   jam,
-		libur: indeksLibur,
-	}, konflik), nil
+	return cocokkan(susunKonteksUsulan(slots, konflik, guru, ruang, jam, indeksLibur), konflik), nil
+}
+
+func susunKonteksUsulan(semua []models.SlotJadwal, konflik models.Konflik, guru []models.Guru, ruang []models.Ruangan, jam []models.JamPelajaran, libur map[string]bool) konteksCocok {
+	return konteksCocok{
+		slots:   slotUntukUsulan(semua, konflik),
+		guru:    guru,
+		ruang:   ruang,
+		jam:     jam,
+		libur:   libur,
+		jamGuru: hitungJamGuru(semua),
+	}
+}
+
+func hitungJamGuru(slots []models.SlotJadwal) map[uuid.UUID]float64 {
+	out := make(map[uuid.UUID]float64)
+	for _, slot := range slots {
+		out[slot.GuruID]++
+	}
+	return out
+}
+
+// slotUntukUsulan menyisakan slot yang bisa memengaruhi cocokkan: slot konflik
+// dan slot yang berbagi hari+jam, guru, kelas, ruangan, atau mapel dengan slot
+// konflik. Semua slot GuruID menjadi inti hanya bila konflik tidak punya slot
+// (guru_kelebihan_jam); bila tidak, inti melebar hari+jam ke hampir seluruh semester.
+func slotUntukUsulan(semua []models.SlotJadwal, konflik models.Konflik) []models.SlotJadwal {
+	intiDariGuru := konflik.SlotAID == nil && konflik.SlotBID == nil
+	inti := map[uuid.UUID]models.SlotJadwal{}
+	for _, s := range semua {
+		if idSama(s.ID, konflik.SlotAID) || idSama(s.ID, konflik.SlotBID) || (intiDariGuru && idSama(s.GuruID, konflik.GuruID)) {
+			inti[s.ID] = s
+		}
+	}
+	var out []models.SlotJadwal
+	for _, s := range semua {
+		if ikutUsulan(s, inti) {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func ikutUsulan(s models.SlotJadwal, inti map[uuid.UUID]models.SlotJadwal) bool {
+	if _, ok := inti[s.ID]; ok {
+		return true
+	}
+	for _, k := range inti {
+		switch {
+		case kunciSama(s.HariID, k.HariID) && kunciSama(s.JamPelajaranID, k.JamPelajaranID),
+			kunciSama(s.GuruID, k.GuruID),
+			kunciSama(s.KelasID, k.KelasID),
+			kunciSama(s.RuanganID, k.RuanganID),
+			kunciSama(s.MataPelajaranID, k.MataPelajaranID):
+			return true
+		}
+	}
+	return false
+}
+
+func idSama(id uuid.UUID, ptr *uuid.UUID) bool {
+	return ptr != nil && kunciSama(id, *ptr)
+}
+
+// kunciSama menolak uuid.Nil agar slot tanpa guru/ruangan tidak saling cocok.
+func kunciSama(a, b uuid.UUID) bool {
+	return a != uuid.Nil && a == b
 }
 
 func cocokkan(k konteksCocok, konflik models.Konflik) []UsulanCocok {
@@ -302,6 +364,9 @@ func (k konteksCocok) sibukKelas(kelasID, hariID, jamID uuid.UUID, minggu int16,
 }
 
 func (k konteksCocok) jamMinggu(guruID uuid.UUID) float64 {
+	if k.jamGuru != nil {
+		return k.jamGuru[guruID]
+	}
 	var n float64
 	for _, slot := range k.slots {
 		if slot.GuruID == guruID {

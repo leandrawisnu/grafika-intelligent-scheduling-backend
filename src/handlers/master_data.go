@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"sync"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/models"
+	"github.com/grafika-scheduling/backend/src/services"
 	"gorm.io/gorm"
 )
 
@@ -16,6 +19,85 @@ func NewPengelolaMaster(db *gorm.DB) *PengelolaMaster {
 	return &PengelolaMaster{db: db}
 }
 
+func (h *PengelolaMaster) Katalog(c *fiber.Ctx) error {
+	var (
+		hari    []models.Hari
+		jam     []models.JamPelajaran
+		kelas   []models.Kelas
+		guru    []models.Guru
+		mapel   []models.MataPelajaran
+		ruangan []models.Ruangan
+		jurusan []models.Jurusan
+		mu      sync.Mutex
+		gagal   error
+		wg      sync.WaitGroup
+	)
+	jalan := func(fn func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(); err != nil {
+				mu.Lock()
+				if gagal == nil {
+					gagal = err
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+	terbatas, terbatasOK := auth.Terbatas(c)
+
+	jalan(func() error {
+		hari = make([]models.Hari, 0)
+		return h.db.Order("urutan_hari").Find(&hari).Error
+	})
+	jalan(func() error {
+		jam = make([]models.JamPelajaran, 0)
+		return h.db.Order("jam_ke").Find(&jam).Error
+	})
+	jalan(func() error {
+		kelas = make([]models.Kelas, 0)
+		q := h.db.Model(&models.Kelas{}).Order("kode").Preload("Jurusan").Preload("Semester")
+		if terbatasOK {
+			q = q.Where("jurusan_id = ?", terbatas)
+		}
+		return q.Find(&kelas).Error
+	})
+	jalan(func() error {
+		guru = make([]models.Guru, 0)
+		return h.db.Order("nama_lengkap").Find(&guru).Error
+	})
+	jalan(func() error {
+		mapel = make([]models.MataPelajaran, 0)
+		return h.db.Order("kode").Find(&mapel).Error
+	})
+	jalan(func() error {
+		ruangan = make([]models.Ruangan, 0)
+		return h.db.Order("kode").Find(&ruangan).Error
+	})
+	jalan(func() error {
+		jurusan = make([]models.Jurusan, 0)
+		q := h.db.Model(&models.Jurusan{}).Order("kode")
+		if terbatasOK {
+			q = q.Where("id = ?", terbatas)
+		}
+		return q.Find(&jurusan).Error
+	})
+	wg.Wait()
+	if gagal != nil {
+		return c.Status(500).JSON(fiber.Map{"error": gagal.Error()})
+	}
+	return c.JSON(fiber.Map{
+		"hari":           hari,
+		"jam_pelajaran":  jam,
+		"kelas":          kelas,
+		"guru":           guru,
+		"mata_pelajaran": mapel,
+		"ruangan":        ruangan,
+		"jurusan":        jurusan,
+	})
+}
+
 func listJSON(c *fiber.Ctx, err error, items interface{}) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -24,6 +106,7 @@ func listJSON(c *fiber.Ctx, err error, items interface{}) error {
 }
 
 func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
+	r.Get("/katalog", h.Katalog)
 	r.Get("/hari", h.DaftarHari)
 
 	r.Get("/tahun-ajaran", h.DaftarTahunAjaran)
@@ -287,8 +370,17 @@ func (h *PengelolaMaster) PerbaruiGuru(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
+	var lama models.Guru
+	if h.db.Select("jam_maksimal_per_minggu").First(&lama, "id = ?", id).Error != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	}
 	h.db.Model(&models.Guru{}).Where("id = ?", id).Updates(&item)
 	h.db.First(&item, "id = ?", id)
+	if item.JamMaksimalPerMinggu != lama.JamMaksimalPerMinggu {
+		if err := services.TandaiSemuaPerluValidasi(h.db); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+	}
 	return c.JSON(item)
 }
 
@@ -313,12 +405,22 @@ func (h *PengelolaMaster) BuatHariLiburGuru(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
 	item.GuruID = id
-	h.db.Create(&item)
+	if err := h.db.Create(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	if err := services.TandaiSemuaPerluValidasi(h.db); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.Status(201).JSON(item)
 }
 
 func (h *PengelolaMaster) HapusHariLiburGuru(c *fiber.Ctx) error {
-	h.db.Delete(&models.HariLiburGuru{}, "id = ?", c.Params("liburId"))
+	if err := h.db.Delete(&models.HariLiburGuru{}, "id = ?", c.Params("liburId")).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	if err := services.TandaiSemuaPerluValidasi(h.db); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.JSON(fiber.Map{"status": "dihapus"})
 }
 
