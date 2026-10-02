@@ -1,0 +1,12 @@
+# Override: publish backend API ke host (stress test / debug).
+#
+# Full stack VM:
+#   docker compose -f docker-compose.yaml -f docker-compose.ghcr.yaml \
+#     -f grafika-intelligent-scheduling-backend/docker-compose.ports.yaml up -d
+#
+# Set BACKEND_BIND=127.0.0.1 di .env root bila hanya SSH tunnel.
+
+services:
+  backend:
+    ports:
+      - "${BACKEND_BIND:-0.0.0.0}:${BACKEND_PORT:-8080}:${BACKEND_PORT:-8080}"
