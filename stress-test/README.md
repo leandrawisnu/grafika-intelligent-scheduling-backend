@@ -83,7 +83,7 @@ Sama seperti browser: login BFF → cookie → `/api/v1/*` lewat Next.js proxy.
 | `session-overhead.js` / `fe-session-overhead.js` | 10→40 | Session reads |
 | `validation-spike.js` / `fe-validation-spike.js` | 1→3 | `POST .../validasi` |
 
-FE scripts use `/api/auth/sesi` (BFF) instead of `/api/v1/auth/sesi`, matching `sesi-context.tsx`.
+FE scripts use `/api/auth/sesi` (BFF) instead of `/api/v1/auth/sesi`, matching `sesi-context.tsx`. Session cookie is serialized as a `Cookie` header (k6 cookie jars do not survive `setup()` → VU).
 
 Thresholds: `k6/lib/options.js`.
 

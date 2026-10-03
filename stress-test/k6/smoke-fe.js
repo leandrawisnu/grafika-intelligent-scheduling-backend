@@ -20,18 +20,18 @@ export function setup() {
   const loginPage = http.get(apiUrl(cfg.baseUrl, "/login"));
   check(loginPage, { "login page ok": (r) => r.status === 200 });
 
-  const jar = loginViaFe(cfg);
-  const targets = discoverTargetsFe(cfg, jar);
+  const session = loginViaFe(cfg);
+  const targets = discoverTargetsFe(cfg, session);
 
   if (!targets.jadwalSemesterId) {
     throw new Error("No jadwal semester found — run backend seed first");
   }
 
-  return { cfg, jar, ...targets };
+  return { cfg, session, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.jar);
+  const opts = feOpts(data.session);
   const jsId = data.jadwalSemesterId;
 
   const responses = http.batch([

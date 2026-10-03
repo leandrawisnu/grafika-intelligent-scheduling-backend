@@ -15,13 +15,13 @@ export const options = {
 export function setup() {
   const cfg = getConfig();
   requireCredentials(cfg);
-  const jar = loginViaFe(cfg);
-  const targets = discoverTargetsFe(cfg, jar);
-  return { cfg, jar, ...targets };
+  const session = loginViaFe(cfg);
+  const targets = discoverTargetsFe(cfg, session);
+  return { cfg, session, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.jar);
+  const opts = feOpts(data.session);
 
   const endpoints = [
     "/api/auth/sesi",

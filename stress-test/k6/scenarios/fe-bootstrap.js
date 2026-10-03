@@ -15,18 +15,18 @@ export const options = {
 export function setup() {
   const cfg = getConfig();
   requireCredentials(cfg);
-  const jar = loginViaFe(cfg);
-  const targets = discoverTargetsFe(cfg, jar);
+  const session = loginViaFe(cfg);
+  const targets = discoverTargetsFe(cfg, session);
 
   if (!targets.jadwalSemesterId) {
     throw new Error("No jadwal semester found — run backend seed first");
   }
 
-  return { cfg, jar, ...targets };
+  return { cfg, session, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.jar);
+  const opts = feOpts(data.session);
   const jsId = data.jadwalSemesterId;
 
   const katalog = http.get(apiUrl(data.cfg.baseUrl, "/api/v1/katalog"), {
