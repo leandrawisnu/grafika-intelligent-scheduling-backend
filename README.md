@@ -79,3 +79,17 @@ Polyrepo ini deploy ke Coolify per-folder — backend pakai `docker-compose.cool
 
 - `GET /health`
 - `/api/v1` — [`src/router/router.go`](src/router/router.go)
+
+## Stress test (k6)
+
+Skrip load test ada di [`stress-test/`](stress-test/). Dua mode: API direct (`smoke`, `bootstrap`, …) dan FE end-to-end lewat Next.js proxy (`fe-smoke`, `fe-bootstrap`, …).
+
+```bash
+cd stress-test
+cp .env.example .env   # K6_BASE_URL, K6_USER, K6_PASSWORD
+chmod +x scripts/run.sh
+./scripts/run.sh smoke
+./scripts/run.sh fe-smoke   # butuh frontend jalan di :3000 atau domain
+```
+
+Detail skenario, threshold, dan slow-query analysis: [`stress-test/README.md`](stress-test/README.md).
