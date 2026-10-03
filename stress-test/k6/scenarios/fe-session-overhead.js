@@ -1,6 +1,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
-import { discoverTargetsFe, feOpts, loginViaFe } from "../lib/auth-fe.js";
+import { discoverTargetsFe, feOpts, feSession, loginViaFe } from "../lib/auth-fe.js";
 import { apiUrl, getConfig, requireCredentials } from "../lib/config.js";
 import { stagesSession, thresholdsReadLight } from "../lib/options.js";
 
@@ -17,11 +17,11 @@ export function setup() {
   requireCredentials(cfg);
   const session = loginViaFe(cfg);
   const targets = discoverTargetsFe(cfg, session);
-  return { cfg, session, ...targets };
+  return { cfg, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.session);
+  const opts = feOpts(feSession(data.cfg));
 
   const endpoints = [
     "/api/auth/sesi",

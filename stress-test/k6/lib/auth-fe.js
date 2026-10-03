@@ -5,29 +5,37 @@ import { apiUrl } from "./config.js";
 const SESSION_COOKIE_NAMES = ["__Host-gis_session", "gis_session"];
 
 /**
- * Build Cookie header from k6 jar (must run in same execution context as login).
+ * Per-VU session cache (module scope is isolated per VU in k6).
+ * Cookie jars / setup() handoff are unreliable for authenticated iterations.
  */
-function cookieHeaderFromJar(jar, baseUrl) {
-  const stored = jar.cookiesForURL(baseUrl);
+let vuFeSession = null;
+
+function cookieHeaderFromResponse(res) {
   for (const name of SESSION_COOKIE_NAMES) {
-    const entry = stored[name];
+    const entry = res.cookies[name];
     if (entry && entry.length > 0 && entry[0].value) {
       return `${name}=${entry[0].value}`;
     }
   }
+  return "";
+}
 
-  const parts = [];
-  for (const name of Object.keys(stored)) {
-    for (const c of stored[name]) {
-      parts.push(`${c.name}=${c.value}`);
+function cookieHeaderFromJar(jar, baseUrl) {
+  const urls = [baseUrl, `${baseUrl}/`, apiUrl(baseUrl, "/api/auth/login")];
+  for (const url of urls) {
+    const stored = jar.cookiesForURL(url);
+    for (const name of SESSION_COOKIE_NAMES) {
+      const entry = stored[name];
+      if (entry && entry.length > 0 && entry[0].value) {
+        return `${name}=${entry[0].value}`;
+      }
     }
   }
-  return parts.join("; ");
+  return "";
 }
 
 /**
  * Browser-like auth: POST /api/auth/login → session cookie → /api/v1/* via Next.js proxy.
- * Returns serializable session for setup() → VU handoff (cookie jar cannot cross that boundary).
  */
 export function loginViaFe(cfg) {
   const jar = http.cookieJar();
@@ -50,12 +58,23 @@ export function loginViaFe(cfg) {
     throw new Error(`FE login failed (${res.status}): ${res.body}`);
   }
 
-  const cookieHeader = cookieHeaderFromJar(jar, cfg.baseUrl);
+  const cookieHeader =
+    cookieHeaderFromResponse(res) || cookieHeaderFromJar(jar, cfg.baseUrl);
   if (!cookieHeader) {
-    throw new Error("FE login: no session cookie in response (expected __Host-gis_session or gis_session)");
+    throw new Error(
+      "FE login: no session cookie in response (expected __Host-gis_session or gis_session)"
+    );
   }
 
   return { cookieHeader };
+}
+
+/** One login per VU — reuse for all iterations in that VU. */
+export function feSession(cfg) {
+  if (!vuFeSession) {
+    vuFeSession = loginViaFe(cfg);
+  }
+  return vuFeSession;
 }
 
 export function feOpts(session) {
@@ -81,12 +100,16 @@ export function discoverTargetsFe(cfg, session) {
       tags: { name: "fe_setup_jadwal_list" },
     });
 
-    if (listRes.status === 200) {
-      const list = listRes.json();
-      const rows = Array.isArray(list) ? list : [];
-      const pick = rows.find((j) => j.punya_kelas_aktif) || rows[0];
-      jadwalSemesterId = pick?.id || "";
+    if (listRes.status !== 200) {
+      throw new Error(
+        `FE discover jadwal-semester failed (${listRes.status}): ${listRes.body}`
+      );
     }
+
+    const list = listRes.json();
+    const rows = Array.isArray(list) ? list : [];
+    const pick = rows.find((j) => j.punya_kelas_aktif) || rows[0];
+    jadwalSemesterId = pick?.id || "";
   }
 
   if (jadwalSemesterId && !jadwalKelasId) {

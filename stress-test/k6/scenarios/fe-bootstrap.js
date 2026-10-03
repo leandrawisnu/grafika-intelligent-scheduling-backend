@@ -1,6 +1,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
-import { discoverTargetsFe, feOpts, loginViaFe } from "../lib/auth-fe.js";
+import { discoverTargetsFe, feOpts, feSession, loginViaFe } from "../lib/auth-fe.js";
 import { apiUrl, getConfig, requireCredentials } from "../lib/config.js";
 import { stagesBootstrap, thresholdsReadLight } from "../lib/options.js";
 
@@ -22,11 +22,11 @@ export function setup() {
     throw new Error("No jadwal semester found — run backend seed first");
   }
 
-  return { cfg, session, ...targets };
+  return { cfg, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.session);
+  const opts = feOpts(feSession(data.cfg));
   const jsId = data.jadwalSemesterId;
 
   const katalog = http.get(apiUrl(data.cfg.baseUrl, "/api/v1/katalog"), {

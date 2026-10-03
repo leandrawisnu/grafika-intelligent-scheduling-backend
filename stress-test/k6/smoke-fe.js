@@ -1,6 +1,6 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
-import { discoverTargetsFe, feOpts, loginViaFe } from "./lib/auth-fe.js";
+import { discoverTargetsFe, feOpts, feSession, loginViaFe } from "./lib/auth-fe.js";
 import { apiUrl, getConfig, requireCredentials } from "./lib/config.js";
 import { stagesSmoke, thresholdsSmoke } from "./lib/options.js";
 
@@ -27,11 +27,11 @@ export function setup() {
     throw new Error("No jadwal semester found — run backend seed first");
   }
 
-  return { cfg, session, ...targets };
+  return { cfg, ...targets };
 }
 
 export default function (data) {
-  const opts = feOpts(data.session);
+  const opts = feOpts(feSession(data.cfg));
   const jsId = data.jadwalSemesterId;
 
   const responses = http.batch([
@@ -65,7 +65,11 @@ export default function (data) {
   ]);
 
   for (const res of responses) {
-    check(res, { "status 2xx": (r) => r.status >= 200 && r.status < 300 });
+    check(res, {
+      "status 2xx": (r) => r.status >= 200 && r.status < 300,
+      "not auth error": (r) =>
+        r.status !== 401 || !String(r.body).includes("Sesi tidak berlaku"),
+    });
   }
 
   sleep(1);
