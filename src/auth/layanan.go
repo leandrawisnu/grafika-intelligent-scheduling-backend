@@ -26,7 +26,7 @@ var (
 
 type Layanan struct {
 	db         *gorm.DB
-	pembatas   *Pembatas
+	pembatas   *Penghitung
 	hashKosong string
 	cacheSesi  *cacheSesi
 }
@@ -40,7 +40,7 @@ func NewLayanan(db *gorm.DB) *Layanan {
 	}
 	return &Layanan{
 		db:         db,
-		pembatas:   BaruPembatas(8, 15*time.Minute),
+		pembatas:   BaruPenghitung(8, 15*time.Minute),
 		hashKosong: hash,
 		cacheSesi:  baruCacheSesi(),
 	}
@@ -166,18 +166,18 @@ type ember struct {
 	reset  time.Time
 }
 
-type Pembatas struct {
+type Penghitung struct {
 	mu      sync.Mutex
 	batas   int
 	jendela time.Duration
 	hit     map[string]*ember
 }
 
-func BaruPembatas(batas int, jendela time.Duration) *Pembatas {
-	return &Pembatas{batas: batas, jendela: jendela, hit: map[string]*ember{}}
+func BaruPenghitung(batas int, jendela time.Duration) *Penghitung {
+	return &Penghitung{batas: batas, jendela: jendela, hit: map[string]*ember{}}
 }
 
-func (p *Pembatas) TerlaluSering(kunci string) bool {
+func (p *Penghitung) TerlaluSering(kunci string) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	e, ok := p.hit[kunci]
@@ -187,7 +187,7 @@ func (p *Pembatas) TerlaluSering(kunci string) bool {
 	return e.jumlah >= p.batas
 }
 
-func (p *Pembatas) Catat(kunci string) {
+func (p *Penghitung) Catat(kunci string) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := time.Now()

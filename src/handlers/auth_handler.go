@@ -24,7 +24,7 @@ func (h *PengelolaAuth) Masuk(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	token, akun, err := h.layanan.Masuk(c.IP(), req.Email, req.Password)
+	token, akun, err := h.layanan.Masuk(auth.ClientIP(c), req.Email, req.Password)
 	c.Set("Cache-Control", "no-store")
 	if errors.Is(err, auth.ErrTerlaluSering) {
 		return c.Status(429).JSON(fiber.Map{"error": "Terlalu banyak percobaan. Coba lagi nanti."})

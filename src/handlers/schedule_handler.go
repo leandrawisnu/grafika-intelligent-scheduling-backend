@@ -21,15 +21,21 @@ type PengelolaJadwal struct {
 	mlClient       *mlclient.Client
 	objek          *storage.Client
 	db             *gorm.DB
+	rateLimiter    fiber.Handler
 }
 
-func NewPengelolaJadwal(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client) *PengelolaJadwal {
+func NewPengelolaJadwal(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, rateLimiter fiber.Handler) *PengelolaJadwal {
+	if rateLimiter == nil {
+		// Pass-through when the limiter is disabled.
+		rateLimiter = func(c *fiber.Ctx) error { return c.Next() }
+	}
 	return &PengelolaJadwal{
 		layananJadwal:  services.NewLayananJadwal(db),
 		layananKonflik: services.NewLayananKonflik(db),
 		mlClient:       mlClient,
 		objek:          objek,
 		db:             db,
+		rateLimiter:    rateLimiter,
 	}
 }
 
@@ -57,7 +63,7 @@ func (h *PengelolaJadwal) DaftarkanRute(r fiber.Router) {
 
 	// Slot
 	r.Post("/jadwal-kelas/:id/slot", h.TambahSlot)
-	r.Post("/jadwal-kelas/:id/slot/massal", h.TambahSlotMassal)
+	r.Post("/jadwal-kelas/:id/slot/massal", h.rateLimiter, h.TambahSlotMassal)
 	r.Put("/slot/:slotId", h.PerbaruiSlot)
 	r.Delete("/slot/:slotId", h.HapusSlot)
 
@@ -67,21 +73,21 @@ func (h *PengelolaJadwal) DaftarkanRute(r fiber.Router) {
 	r.Post("/jadwal-semester/:id/tugaskan-guru/massal", h.TugaskanMassal)
 	r.Get("/jadwal-semester/:id/ketersediaan-guru", h.KetersediaanGuru)
 
-	// Konflik
+	// Konflik — endpoint berat dibatasi laju permintaannya
 	r.Get("/jadwal-semester/:id/konflik", h.DaftarKonflik)
-	r.Post("/jadwal-semester/:id/validasi", h.Validasi)
-	r.Post("/jadwal-semester/:id/prediksi-konflik", h.PrediksiKonflik)
-	r.Post("/jadwal-semester/:id/demo-konflik", h.DemoKonflik)
+	r.Post("/jadwal-semester/:id/validasi", h.rateLimiter, h.Validasi)
+	r.Post("/jadwal-semester/:id/prediksi-konflik", h.rateLimiter, h.PrediksiKonflik)
+	r.Post("/jadwal-semester/:id/demo-konflik", h.rateLimiter, h.DemoKonflik)
 
 	// Impor berkas jadwal
-	r.Post("/jadwal-semester/:id/impor/pratinjau", h.PratinjauImpor)
-	r.Post("/jadwal-semester/:id/impor", h.SimpanImpor)
+	r.Post("/jadwal-semester/:id/impor/pratinjau", h.rateLimiter, h.PratinjauImpor)
+	r.Post("/jadwal-semester/:id/impor", h.rateLimiter, h.SimpanImpor)
 
 	// AI
-	r.Post("/konflik/:id/selesaikan", h.SelesaikanKonflik)
+	r.Post("/konflik/:id/selesaikan", h.rateLimiter, h.SelesaikanKonflik)
 	r.Get("/konflik/:id/resolusi", h.DaftarResolusi)
-	r.Post("/konflik/:id/jelaskan", h.JelaskanKonflik)
-	r.Post("/resolusi/:id/terima", h.TerimaResolusi)
+	r.Post("/konflik/:id/jelaskan", h.rateLimiter, h.JelaskanKonflik)
+	r.Post("/resolusi/:id/terima", h.rateLimiter, h.TerimaResolusi)
 	r.Post("/ai/tanya", h.AITanya)
 }
 

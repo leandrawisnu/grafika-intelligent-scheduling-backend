@@ -25,6 +25,7 @@ disertakan** — butuh layanan ML :8000 terpisah.
   kosong tanpa slot: `./scripts/seed-demo.sh --skeleton-only`)
 - **FE mode**: frontend harus jalan (`http://127.0.0.1:3000` atau domain publik lewat Caddy → frontend)
 - Load-test user credentials (hindari admin produksi)
+- **Rate limit**: backend membatasi endpoint berat per pengguna (`GIS_RATE_LIMIT`, default 60 permintaan/menit). Skenario `resolver-flow` dan `plotting-crud` bisa melampaui itu — naikkan di `.env` backend (`GIS_RATE_LIMIT=600`) atau matikan (`GIS_RATE_LIMIT=0`) saat load test.
 
 ## Setup
 
