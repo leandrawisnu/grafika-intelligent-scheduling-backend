@@ -20,7 +20,7 @@ echo "=== GIS smoke comparison ==="
 printf "%-20s %12s %12s %12s %12s\n" "endpoint" "FE p95 ms" "API p95 ms" "FE bytes" "API bytes"
 echo "--------------------------------------------------------------------------------"
 
-TAGS=(katalog auth_sesi jadwal_list jadwal_detail jk_aktif_ringkas ringkasan konflik)
+TAGS=(katalog auth_sesi jadwal_list jadwal_detail jk_aktif_ringkas ringkasan)
 for tag in "${TAGS[@]}"; do
   fe_p95="n/a"
   api_p95="n/a"

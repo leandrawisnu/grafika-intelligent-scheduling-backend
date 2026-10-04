@@ -37,7 +37,6 @@ export const smokeBootstrapTags = [
   "jadwal_detail",
   "jk_aktif_ringkas",
   "ringkasan",
-  "konflik",
 ];
 
 export const thresholdsSmoke = {
@@ -57,8 +56,8 @@ export const thresholdsSmokeBootstrap = {
  */
 export const thresholdsSmokeFe = {
   http_req_failed: ["rate<0.05"],
-  http_req_duration: ["p(95)<5000"],
-  ...perEndpointThresholds(smokeBootstrapTags, 5000, { konflik: 8000 }),
+  http_req_duration: ["p(95)<2000"],
+  ...perEndpointThresholds(smokeBootstrapTags, 2000),
 };
 
 function perEndpointThresholds(tags, p95Ms, overrides = {}) {
