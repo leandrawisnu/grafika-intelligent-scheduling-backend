@@ -29,10 +29,51 @@ export const stagesValidation = [
   { duration: "10s", target: 0 },
 ];
 
+/** Tags used by smoke / fe-smoke bootstrap batch. */
+export const smokeBootstrapTags = [
+  "katalog",
+  "auth_sesi",
+  "jadwal_list",
+  "jadwal_detail",
+  "jk_aktif_ringkas",
+  "ringkasan",
+  "konflik",
+];
+
 export const thresholdsSmoke = {
   http_req_failed: ["rate<0.05"],
   http_req_duration: ["p(95)<2000"],
 };
+
+/** API-direct smoke: per-endpoint latency (abortOnFail false = report only). */
+export const thresholdsSmokeBootstrap = {
+  http_req_failed: ["rate<0.05"],
+  http_req_duration: ["p(95)<2000"],
+  ...perEndpointThresholds(smokeBootstrapTags, 2000),
+};
+
+/**
+ * FE proxy smoke: looser overall SLO; per-endpoint thresholds for diagnosis.
+ */
+export const thresholdsSmokeFe = {
+  http_req_failed: ["rate<0.05"],
+  http_req_duration: ["p(95)<5000"],
+  ...perEndpointThresholds(smokeBootstrapTags, 5000, { konflik: 8000 }),
+};
+
+function perEndpointThresholds(tags, p95Ms, overrides = {}) {
+  const out = {};
+  for (const name of tags) {
+    const limit = overrides[name] ?? p95Ms;
+    out[`http_req_duration{name:${name}}`] = [
+      { threshold: `p(95)<${limit}`, abortOnFail: false },
+    ];
+    out[`response_size_bytes{name:${name}}`] = [
+      { threshold: "avg<5000000", abortOnFail: false },
+    ];
+  }
+  return out;
+}
 
 export const thresholdsReadLight = {
   http_req_failed: ["rate<0.01"],

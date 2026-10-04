@@ -417,9 +417,18 @@ func (h *PengelolaJadwal) KetersediaanGuru(c *fiber.Ctx) error {
 
 func (h *PengelolaJadwal) DaftarKonflik(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
+	q := h.db.Select(
+		"id", "jadwal_semester_id", "tipe_konflik", "tingkat_keparahan",
+		"slot_a_id", "slot_b_id", "guru_id", "deskripsi", "terselesaikan", "terdeteksi_pada",
+	).Where("jadwal_semester_id = ?", id)
+	// Default: hanya konflik terbuka (bootstrap UI tidak butuh riwayat selesai — hemat ~MB payload).
+	if c.Query("semua") != "1" {
+		q = q.Where("terselesaikan = ?", false)
+	}
 	var konflik []models.Konflik
-	h.db.Select("id", "created_at", "updated_at", "jadwal_semester_id", "tipe_konflik", "tingkat_keparahan", "slot_a_id", "slot_b_id", "guru_id", "deskripsi", "terselesaikan", "diselesaikan_oleh", "terdeteksi_pada", "terselesaikan_pada").
-		Where("jadwal_semester_id = ?", id).Order("terdeteksi_pada DESC").Find(&konflik)
+	if err := q.Order("terdeteksi_pada DESC").Find(&konflik).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
 	return c.JSON(konflik)
 }
 

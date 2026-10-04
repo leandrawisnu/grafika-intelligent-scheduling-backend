@@ -1,12 +1,15 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { runApiBootstrapBatch } from "./lib/bootstrap-smoke.js";
 import { discoverTargets, login, sessionHeaders } from "./lib/auth.js";
 import { apiUrl, getConfig, requireCredentials } from "./lib/config.js";
-import { stagesSmoke, thresholdsSmoke } from "./lib/options.js";
+import { katalogHeaders } from "./lib/katalog-etag.js";
+import { stagesSmoke, thresholdsSmokeBootstrap } from "./lib/options.js";
+import { bootstrapSummary } from "./lib/summary.js";
 
 export const options = {
   stages: stagesSmoke,
-  thresholds: thresholdsSmoke,
+  thresholds: thresholdsSmokeBootstrap,
 };
 
 export function setup() {
@@ -28,41 +31,13 @@ export function setup() {
 
 export default function (data) {
   const headers = sessionHeaders(data.token);
-  const jsId = data.jadwalSemesterId;
+  const kHdr = katalogHeaders({ headers }).headers;
 
-  const responses = http.batch([
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/v1/katalog"), null, { headers, tags: { name: "katalog" } }],
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/v1/auth/sesi"), null, { headers, tags: { name: "auth_sesi" } }],
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/v1/jadwal-semester"), null, { headers, tags: { name: "jadwal_list" } }],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}`),
-      null,
-      { headers, tags: { name: "jadwal_detail" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/jadwal-kelas-aktif?ringkas=1`),
-      null,
-      { headers, tags: { name: "jk_aktif_ringkas" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/ringkasan`),
-      null,
-      { headers, tags: { name: "ringkasan" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/konflik`),
-      null,
-      { headers, tags: { name: "konflik" } },
-    ],
-  ]);
-
-  for (const res of responses) {
-    check(res, { "status 2xx": (r) => r.status >= 200 && r.status < 300 });
-  }
+  runApiBootstrapBatch(data.cfg.baseUrl, data.jadwalSemesterId, headers, kHdr);
 
   sleep(1);
+}
+
+export function handleSummary(data) {
+  return bootstrapSummary(data, "smoke-api");
 }

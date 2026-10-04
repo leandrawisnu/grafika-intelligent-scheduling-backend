@@ -67,7 +67,26 @@ Sama seperti browser: login BFF → cookie → `/api/v1/*` lewat Next.js proxy.
 
 **Catatan routing production:** skrip FE butuh request masuk ke **frontend** (Next.js). Kalau Caddy mengarahkan semua `/api/*` langsung ke Go, `/api/auth/login` tidak akan jalan — pakai domain yang lewat frontend, atau tes dari dalam VM ke `http://frontend:3000`.
 
-## Export hasil
+## Export & analisis latency
+
+Smoke tests emit `results/fe-smoke-summary.json` (per-endpoint p95 + avg bytes).
+
+```bash
+./scripts/run.sh fe-smoke
+./scripts/summarize-results.sh results/fe-smoke-summary.json results/smoke-api-summary.json
+```
+
+Bandingkan FE proxy vs API direct:
+
+```bash
+K6_BASE_URL_FE=https://your-domain \
+K6_BASE_URL_API=http://127.0.0.1:8080 \
+./scripts/compare-smoke.sh
+```
+
+Lihat `results/BOTTLENECK.md` untuk analisis terbaru.
+
+## Export hasil mentah
 
 ```bash
 ./scripts/run.sh fe-bootstrap -- --out json=results/fe-bootstrap.json
@@ -90,7 +109,8 @@ Thresholds: `k6/lib/options.js`.
 ## Slow query analysis
 
 ```bash
-psql "$DATABASE_URL" -f scripts/pg-slow-queries.sql
+DATABASE_URL=postgres://... ./scripts/run-pg-slow-queries.sh
+# atau: psql "$DATABASE_URL" -f scripts/pg-slow-queries.sql
 ```
 
 ## Structure

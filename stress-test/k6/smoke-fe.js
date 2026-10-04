@@ -1,8 +1,11 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
+import { runFeBootstrapBatch } from "./lib/bootstrap-smoke.js";
 import { discoverTargetsFe, feOpts, feSession, loginViaFe } from "./lib/auth-fe.js";
 import { apiUrl, getConfig, requireCredentials } from "./lib/config.js";
-import { stagesSmoke, thresholdsSmoke } from "./lib/options.js";
+import { katalogHeaders } from "./lib/katalog-etag.js";
+import { stagesSmoke, thresholdsSmokeFe } from "./lib/options.js";
+import { bootstrapSummary } from "./lib/summary.js";
 
 /**
  * E2E smoke: login via Next.js BFF, API via /api/v1 proxy (same-origin cookie).
@@ -10,7 +13,7 @@ import { stagesSmoke, thresholdsSmoke } from "./lib/options.js";
  */
 export const options = {
   stages: stagesSmoke,
-  thresholds: thresholdsSmoke,
+  thresholds: thresholdsSmokeFe,
 };
 
 export function setup() {
@@ -32,45 +35,13 @@ export function setup() {
 
 export default function (data) {
   const opts = feOpts(feSession(data.cfg));
-  const jsId = data.jadwalSemesterId;
+  const kOpts = katalogHeaders(opts);
 
-  const responses = http.batch([
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/v1/katalog"), null, { ...opts, tags: { name: "katalog" } }],
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/auth/sesi"), null, { ...opts, tags: { name: "auth_sesi" } }],
-    ["GET", apiUrl(data.cfg.baseUrl, "/api/v1/jadwal-semester"), null, { ...opts, tags: { name: "jadwal_list" } }],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}`),
-      null,
-      { ...opts, tags: { name: "jadwal_detail" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/jadwal-kelas-aktif?ringkas=1`),
-      null,
-      { ...opts, tags: { name: "jk_aktif_ringkas" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/ringkasan`),
-      null,
-      { ...opts, tags: { name: "ringkasan" } },
-    ],
-    [
-      "GET",
-      apiUrl(data.cfg.baseUrl, `/api/v1/jadwal-semester/${jsId}/konflik`),
-      null,
-      { ...opts, tags: { name: "konflik" } },
-    ],
-  ]);
-
-  for (const res of responses) {
-    check(res, {
-      "status 2xx": (r) => r.status >= 200 && r.status < 300,
-      "not auth error": (r) =>
-        r.status !== 401 || !String(r.body).includes("Sesi tidak berlaku"),
-    });
-  }
+  runFeBootstrapBatch(data.cfg.baseUrl, data.jadwalSemesterId, opts, kOpts);
 
   sleep(1);
+}
+
+export function handleSummary(data) {
+  return bootstrapSummary(data, "fe-smoke");
 }

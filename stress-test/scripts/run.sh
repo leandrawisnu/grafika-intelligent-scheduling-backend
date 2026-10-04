@@ -18,11 +18,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCENARIO="${1:-smoke}"
 shift || true
 
+# Preserve K6_BASE_URL when caller overrides (e.g. compare-smoke.sh API direct).
+_PRESET_K6_BASE_URL="${K6_BASE_URL-}"
+
 if [[ -f "$ROOT/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
   source "$ROOT/.env"
   set +a
+fi
+
+if [[ -n "$_PRESET_K6_BASE_URL" ]]; then
+  export K6_BASE_URL="$_PRESET_K6_BASE_URL"
 fi
 
 if ! command -v k6 >/dev/null 2>&1; then
