@@ -60,7 +60,7 @@ jobs:
           port: ${{ secrets.VM_PORT || 22 }}
           key: ${{ secrets.VM_SSH_KEY }}
           host_key: ${{ secrets.VM_KNOWN_HOSTS }}
-          envs: VM_DEPLOY_DIR
+          envs: VM_DEPLOY_DIR, VM_DEPLOY_CMD
           script: |
             set -e
             DIR="${VM_DEPLOY_DIR:-$HOME/grafika-intelligent-scheduling-backend}"
@@ -71,4 +71,8 @@ jobs:
             git fetch origin
             git checkout -f main
             git reset --hard origin/main
-            docker compose up -d --build
+            if [ -n "${VM_DEPLOY_CMD:-}" ]; then
+              sh -c "$VM_DEPLOY_CMD"
+            else
+              docker compose up -d --build
+            fi
