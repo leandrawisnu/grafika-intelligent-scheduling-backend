@@ -11,6 +11,7 @@ const (
 	GerbangCekSlot         = "cek-slot"
 	GerbangCekJurusanBody  = "cek-jurusan-body"
 	GerbangCekJurusanParam = "cek-jurusan-param"
+	GerbangCekDokumenImpor = "cek-dokumen-impor"
 )
 
 // GerbangKoor mengelompokkan mutasi koor jurusan.
@@ -25,6 +26,8 @@ func GerbangKoor(method, path string) string {
 	}
 	p := path
 	switch {
+	case strings.Contains(p, "/dokumen-impor"):
+		return GerbangCekDokumenImpor
 	case strings.Contains(p, "/tugaskan-guru"),
 		strings.Contains(p, "/publikasi"),
 		strings.Contains(p, "/batalkan-publikasi"),

@@ -312,7 +312,7 @@ func mengubahKatalog(path string) bool {
 			continue
 		}
 		switch p {
-		case "jurusan", "mata-pelajaran", "kelas", "ruangan", "jam-pelajaran", "plotting", "semester":
+		case "jurusan", "mata-pelajaran", "kelas", "ruangan", "jam-pelajaran", "plotting", "semester", "dokumen-impor":
 			return true
 		case "guru":
 			return !adaSegmen(bagian[i:], "hari-libur")

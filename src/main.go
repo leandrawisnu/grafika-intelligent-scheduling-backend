@@ -14,7 +14,9 @@ import (
 	"github.com/grafika-scheduling/backend/src/auth"
 	"github.com/grafika-scheduling/backend/src/config"
 	"github.com/grafika-scheduling/backend/src/database"
+	"github.com/grafika-scheduling/backend/src/models"
 	"github.com/grafika-scheduling/backend/src/router"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -39,6 +41,7 @@ func main() {
 	}
 
 	db := database.Connect(dsn)
+	bersihkanDokumenImporMacet(db)
 	if err := auth.NewLayanan(db).PastikanAdmin(cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		log.Fatalf("akun admin: %v", err)
 	}
@@ -53,6 +56,23 @@ func main() {
 	log.Printf("Grafika Scheduling mendengarkan %s\n", cfg.ListenAddr())
 	if err := app.Listen(cfg.ListenAddr()); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// bersihkanDokumenImporMacet menandai job impor AI yang tertinggal "memproses"
+// (mis. server berhenti di tengah proses) supaya user bisa menjalankan ulangi.
+func bersihkanDokumenImporMacet(db *gorm.DB) {
+	if !db.Migrator().HasTable(&models.DokumenImpor{}) {
+		return
+	}
+	hasil := db.Model(&models.DokumenImpor{}).
+		Where("status = ?", "memproses").
+		Updates(map[string]any{
+			"status": "gagal",
+			"pesan":  "Server berhenti saat memproses dokumen ini. Gunakan Ulangi analisis.",
+		})
+	if hasil.RowsAffected > 0 {
+		log.Printf("%d dokumen impor macet ditandai gagal", hasil.RowsAffected)
 	}
 }
 
