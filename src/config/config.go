@@ -22,7 +22,6 @@ type Config struct {
 	DBPort         int
 	databaseURL    string // set when DATABASE_URL provided explicitly
 	MLServiceURL   string
-	AutoMigrate    bool
 	CORSOrigins    string
 	AdminEmail     string
 	AdminPassword  string
@@ -64,7 +63,6 @@ func Load() *Config {
 		DBPort:         getEnvInt("DB_PORT", 5432),
 		databaseURL:    os.Getenv("DATABASE_URL"),
 		MLServiceURL:   getEnv("ML_SERVICE_URL", "http://localhost:8000"),
-		AutoMigrate:    getEnvBool("GIS_AUTO_MIGRATE", false),
 		CORSOrigins:    getEnv("GIS_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"),
 		AdminEmail:     os.Getenv("GIS_ADMIN_EMAIL"),
 		AdminPassword:  os.Getenv("GIS_ADMIN_PASSWORD"),

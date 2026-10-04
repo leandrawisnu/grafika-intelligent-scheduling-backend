@@ -47,8 +47,10 @@ func (Semester) TableName() string { return "semester" }
 
 type Jurusan struct {
 	BaseModel
-	Kode string `gorm:"uniqueIndex;not null;column:kode;size:20" json:"kode"`
-	Nama string `gorm:"not null;column:nama;size:100" json:"nama"`
+	Kode       string    `gorm:"uniqueIndex:idx_jurusan_sem_kode,priority:2;not null;column:kode;size:20" json:"kode"`
+	Nama       string    `gorm:"not null;column:nama;size:100" json:"nama"`
+	SemesterID uuid.UUID `gorm:"uniqueIndex:idx_jurusan_sem_kode,priority:1;not null;type:uuid;column:semester_id" json:"semester_id"`
+	Semester   *Semester `gorm:"foreignKey:SemesterID" json:"semester,omitempty"`
 }
 
 func (Jurusan) TableName() string { return "jurusan" }
@@ -97,12 +99,12 @@ func (MataPelajaran) TableName() string { return "mata_pelajaran" }
 
 type Kelas struct {
 	BaseModel
-	Kode       string    `gorm:"uniqueIndex;not null;column:kode;size:30" json:"kode"`
+	Kode       string    `gorm:"uniqueIndex:idx_kelas_sem_kode,priority:2;not null;column:kode;size:30" json:"kode"`
 	Nama       string    `gorm:"not null;column:nama;size:100" json:"nama"`
 	Tingkat    int16     `gorm:"not null;column:tingkat" json:"tingkat"`
 	JurusanID  uuid.UUID `gorm:"type:uuid;column:jurusan_id" json:"jurusan_id"`
 	Jurusan    *Jurusan  `gorm:"foreignKey:JurusanID" json:"jurusan,omitempty"`
-	SemesterID uuid.UUID `gorm:"not null;type:uuid;column:semester_id" json:"semester_id"`
+	SemesterID uuid.UUID `gorm:"uniqueIndex:idx_kelas_sem_kode,priority:1;not null;type:uuid;column:semester_id" json:"semester_id"`
 	Semester   *Semester `gorm:"foreignKey:SemesterID" json:"semester,omitempty"`
 }
 
@@ -110,11 +112,13 @@ func (Kelas) TableName() string { return "kelas" }
 
 type Ruangan struct {
 	BaseModel
-	Kode        string `gorm:"uniqueIndex;not null;column:kode;size:20" json:"kode"`
-	Nama        string `gorm:"not null;column:nama;size:100" json:"nama"`
-	Kapasitas   int    `gorm:"not null;default:30;column:kapasitas" json:"kapasitas"`
-	TipeRuangan string `gorm:"default:kelas;column:tipe_ruangan;size:30" json:"tipe_ruangan"`
-	Aktif       bool   `gorm:"default:true;column:aktif" json:"aktif"`
+	Kode        string    `gorm:"uniqueIndex:idx_ruangan_sem_kode,priority:2;not null;column:kode;size:20" json:"kode"`
+	Nama        string    `gorm:"not null;column:nama;size:100" json:"nama"`
+	Kapasitas   int       `gorm:"not null;default:30;column:kapasitas" json:"kapasitas"`
+	TipeRuangan string    `gorm:"default:kelas;column:tipe_ruangan;size:30" json:"tipe_ruangan"`
+	Aktif       bool      `gorm:"default:true;column:aktif" json:"aktif"`
+	SemesterID  uuid.UUID `gorm:"uniqueIndex:idx_ruangan_sem_kode,priority:1;not null;type:uuid;column:semester_id" json:"semester_id"`
+	Semester    *Semester `gorm:"foreignKey:SemesterID" json:"semester,omitempty"`
 }
 
 func (Ruangan) TableName() string { return "ruangan" }
@@ -154,6 +158,28 @@ type HariLiburGuru struct {
 }
 
 func (HariLiburGuru) TableName() string { return "hari_libur_guru" }
+
+// Plotting: rencana penugasan per jam per semester.
+// Satu record = satu jam pelajaran (kelas, hari, jam); tanpa timespan.
+type Plotting struct {
+	BaseModel
+	SemesterID      uuid.UUID      `gorm:"uniqueIndex:idx_plotting_sel,priority:1;not null;type:uuid;column:semester_id" json:"semester_id"`
+	Semester        *Semester      `gorm:"foreignKey:SemesterID" json:"semester,omitempty"`
+	KelasID         uuid.UUID      `gorm:"uniqueIndex:idx_plotting_sel,priority:2;not null;type:uuid;column:kelas_id" json:"kelas_id"`
+	Kelas           *Kelas         `gorm:"foreignKey:KelasID" json:"kelas,omitempty"`
+	HariID          uuid.UUID      `gorm:"uniqueIndex:idx_plotting_sel,priority:3;not null;type:uuid;column:hari_id" json:"hari_id"`
+	Hari            *Hari          `gorm:"foreignKey:HariID" json:"hari,omitempty"`
+	JamPelajaranID  uuid.UUID      `gorm:"uniqueIndex:idx_plotting_sel,priority:4;not null;type:uuid;column:jam_pelajaran_id" json:"jam_pelajaran_id"`
+	JamPelajaran    *JamPelajaran  `gorm:"foreignKey:JamPelajaranID" json:"jam_pelajaran,omitempty"`
+	MataPelajaranID uuid.UUID      `gorm:"not null;type:uuid;column:mata_pelajaran_id" json:"mata_pelajaran_id"`
+	MataPelajaran   *MataPelajaran `gorm:"foreignKey:MataPelajaranID" json:"mata_pelajaran,omitempty"`
+	GuruID          uuid.UUID      `gorm:"not null;type:uuid;column:guru_id;index:idx_plotting_guru_sem,priority:2" json:"guru_id"`
+	Guru            *Guru          `gorm:"foreignKey:GuruID" json:"guru,omitempty"`
+	RuanganID       *uuid.UUID     `gorm:"type:uuid;column:ruangan_id" json:"ruangan_id,omitempty"`
+	Ruangan         *Ruangan       `gorm:"foreignKey:RuanganID" json:"ruangan,omitempty"`
+}
+
+func (Plotting) TableName() string { return "plotting" }
 
 // ---- JADWAL BARU ----
 

@@ -1,4 +1,4 @@
--- Mata pelajaran & guru (singkatan PDF SMKN 4 Ganjil 2026/2027)
+-- Mata pelajaran & guru (singkatan PDF SMKN 4 Demo - Ganjil 2026/2027)
 -- Idempotent. Jalankan sebelum seed slot.
 
 BEGIN;

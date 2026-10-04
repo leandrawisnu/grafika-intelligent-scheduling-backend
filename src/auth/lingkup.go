@@ -71,61 +71,123 @@ func Terbatas(c *fiber.Ctx) (uuid.UUID, bool) {
 	return *akun.JurusanID, true
 }
 
+// KodeJurusanPengguna resolve kode jurusan milik pengguna koor.
+// Jurusan per-semester (N copy per kode), jadi pemanggil yang butuh filter
+// lintas semester harus bandingkan kode, bukan UUID.
+func KodeJurusanPengguna(db *gorm.DB, c *fiber.Ctx) (string, bool) {
+	akun, ok := Dari(c)
+	if !ok || akun.Peran != "koor_jurusan" || akun.JurusanID == nil {
+		return "", false
+	}
+	if akun.Jurusan != nil && akun.Jurusan.Kode != "" {
+		return akun.Jurusan.Kode, true
+	}
+	var j models.Jurusan
+	if err := db.Select("kode").First(&j, "id = ?", *akun.JurusanID).Error; err != nil {
+		return "", false
+	}
+	return j.Kode, true
+}
+
 func Dari(c *fiber.Ctx) (models.Pengguna, bool) {
 	akun, ok := c.Locals(LocalPengguna).(models.Pengguna)
 	return akun, ok
 }
 
 func SaringSemester(c *fiber.Ctx, js *models.JadwalSemester) {
-	id, ok := Terbatas(c)
+	kode, ok := kodeJurusanC(c)
 	if !ok || js == nil {
 		return
 	}
 	jurusan := make([]models.JadwalSemesterJurusan, 0)
 	for _, item := range js.Jurusan {
-		if item.JurusanID == id {
+		if item.Jurusan != nil && item.Jurusan.Kode == kode {
 			jurusan = append(jurusan, item)
 		}
 	}
 	js.Jurusan = jurusan
 	kelas := make([]models.JadwalKelas, 0)
 	for _, item := range js.JadwalKelas {
-		if item.JurusanID == id {
+		if item.Jurusan != nil && item.Jurusan.Kode == kode {
+			kelas = append(kelas, item)
+		} else if item.Jurusan == nil && item.Kelas != nil && item.Kelas.Jurusan != nil && item.Kelas.Jurusan.Kode == kode {
 			kelas = append(kelas, item)
 		}
 	}
 	js.JadwalKelas = kelas
 }
 
+// kodeJurusanC resolve kode jurusan milik koor dari pengguna.jurusan_id.
+// Jurusan kini per-semester (N copy), jadi perbandingan memakai kode, bukan UUID.
+func kodeJurusanC(c *fiber.Ctx) (string, bool) {
+	akun, ok := Dari(c)
+	if !ok || akun.Peran != "koor_jurusan" || akun.JurusanID == nil {
+		return "", false
+	}
+	if akun.Jurusan != nil && akun.Jurusan.Kode != "" {
+		return akun.Jurusan.Kode, true
+	}
+	return "", false
+}
+
+func (l *Lingkup) kodeJurusan(jurusanID uuid.UUID) (string, bool) {
+	var j models.Jurusan
+	if err := l.db.Select("kode").First(&j, "id = ?", jurusanID).Error; err != nil {
+		return "", false
+	}
+	return j.Kode, true
+}
+
 func (l *Lingkup) kelas(c *fiber.Ctx, jurusanID uuid.UUID) error {
+	kode, ok := l.kodeJurusan(jurusanID)
+	if !ok {
+		return ErrAksesDitolak
+	}
 	if c.Method() == fiber.MethodPost {
 		var body struct {
 			JurusanID string `json:"jurusan_id"`
 		}
-		if json.Unmarshal(c.Body(), &body) != nil || !samaUUID(body.JurusanID, jurusanID) {
+		if json.Unmarshal(c.Body(), &body) != nil {
+			return ErrAksesDitolak
+		}
+		var target models.Jurusan
+		if err := l.db.Select("kode").First(&target, "id = ?", body.JurusanID).Error; err != nil {
+			return ErrAksesDitolak
+		}
+		if target.Kode != kode {
 			return ErrAksesDitolak
 		}
 		return nil
 	}
 	var kelas models.Kelas
-	if err := l.db.Select("jurusan_id").First(&kelas, "id = ?", c.Params("id")).Error; err != nil {
+	if err := l.db.Preload("Jurusan").Select("jurusan_id").First(&kelas, "id = ?", c.Params("id")).Error; err != nil {
 		return nil
 	}
-	if kelas.JurusanID != jurusanID {
+	if kelas.Jurusan == nil || kelas.Jurusan.Kode != kode {
 		return ErrAksesDitolak
 	}
 	if c.Method() == fiber.MethodPut {
 		var body struct {
 			JurusanID string `json:"jurusan_id"`
 		}
-		if json.Unmarshal(c.Body(), &body) == nil && body.JurusanID != "" && !samaUUID(body.JurusanID, jurusanID) {
-			return ErrAksesDitolak
+		if json.Unmarshal(c.Body(), &body) == nil && body.JurusanID != "" {
+			var target models.Jurusan
+			if err := l.db.Select("kode").First(&target, "id = ?", body.JurusanID).Error; err != nil {
+				return ErrAksesDitolak
+			}
+			if target.Kode != kode {
+				return ErrAksesDitolak
+			}
 		}
 	}
 	return nil
 }
 
 func (l *Lingkup) kelasDiBody(c *fiber.Ctx, jurusanID uuid.UUID) error {
+	kode, ok := l.kodeJurusan(jurusanID)
+	if !ok {
+		return ErrAksesDitolak
+	}
 	var body struct {
 		KelasID string `json:"kelas_id"`
 	}
@@ -133,24 +195,31 @@ func (l *Lingkup) kelasDiBody(c *fiber.Ctx, jurusanID uuid.UUID) error {
 		return ErrAksesDitolak
 	}
 	var kelas models.Kelas
-	if err := l.db.Select("jurusan_id").First(&kelas, "id = ?", body.KelasID).Error; err != nil {
+	if err := l.db.Preload("Jurusan").Select("jurusan_id").First(&kelas, "id = ?", body.KelasID).Error; err != nil {
 		return ErrAksesDitolak
 	}
-	if kelas.JurusanID != jurusanID {
+	if kelas.Jurusan == nil || kelas.Jurusan.Kode != kode {
 		return ErrAksesDitolak
 	}
 	return nil
 }
 
 func (l *Lingkup) jadwalKelas(id string, jurusanID uuid.UUID) error {
+	kode, ok := l.kodeJurusan(jurusanID)
+	if !ok {
+		return ErrAksesDitolak
+	}
 	var jk models.JadwalKelas
-	if err := l.db.Select("jurusan_id").First(&jk, "id = ?", id).Error; err != nil {
+	if err := l.db.Preload("Jurusan").Preload("Kelas.Jurusan").Select("jurusan_id", "kelas_id").First(&jk, "id = ?", id).Error; err != nil {
 		return ErrAksesDitolak
 	}
-	if jk.JurusanID != jurusanID {
-		return ErrAksesDitolak
+	if jk.Jurusan != nil && jk.Jurusan.Kode == kode {
+		return nil
 	}
-	return nil
+	if jk.Kelas != nil && jk.Kelas.Jurusan != nil && jk.Kelas.Jurusan.Kode == kode {
+		return nil
+	}
+	return ErrAksesDitolak
 }
 
 func (l *Lingkup) slot(slotID string, jurusanID uuid.UUID) error {

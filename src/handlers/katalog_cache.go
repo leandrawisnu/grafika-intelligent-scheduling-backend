@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/grafika-scheduling/backend/src/models"
+	"gorm.io/gorm"
 )
 
 const tahanKatalog = 30 * time.Second
@@ -60,12 +61,14 @@ type barisRuangan struct {
 	Kapasitas   int       `gorm:"column:kapasitas" json:"kapasitas"`
 	TipeRuangan string    `gorm:"column:tipe_ruangan" json:"tipe_ruangan"`
 	Aktif       bool      `gorm:"column:aktif" json:"aktif"`
+	SemesterID  uuid.UUID `gorm:"column:semester_id" json:"semester_id"`
 }
 
 type barisJurusan struct {
-	ID   uuid.UUID `gorm:"column:id" json:"id"`
-	Kode string    `gorm:"column:kode" json:"kode"`
-	Nama string    `gorm:"column:nama" json:"nama"`
+	ID         uuid.UUID `gorm:"column:id" json:"id"`
+	Kode       string    `gorm:"column:kode" json:"kode"`
+	Nama       string    `gorm:"column:nama" json:"nama"`
+	SemesterID uuid.UUID `gorm:"column:semester_id" json:"semester_id"`
 }
 
 type badanKatalog struct {
@@ -155,7 +158,16 @@ func etagDari(body []byte) string {
 	return `"` + hex.EncodeToString(sum[:8]) + `"`
 }
 
-func (h *PengelolaMaster) bangunKatalog(terbatas uuid.UUID, terbatasOK bool) ([]byte, string, error) {
+// kodeJurusanCache resolve kode jurusan dari UUID pengguna koor (jurusan per-semester).
+func kodeJurusanCache(db *gorm.DB, jurusanID uuid.UUID) (string, bool) {
+	var j models.Jurusan
+	if err := db.Select("kode").First(&j, "id = ?", jurusanID).Error; err != nil {
+		return "", false
+	}
+	return j.Kode, true
+}
+
+func (h *PengelolaMaster) bangunKatalog(semID, terbatas uuid.UUID, terbatasOK bool) ([]byte, string, error) {
 	var (
 		hari    []barisHari
 		jam     []barisJam
@@ -197,10 +209,18 @@ func (h *PengelolaMaster) bangunKatalog(terbatas uuid.UUID, terbatasOK bool) ([]
 	jalan(func() error {
 		kelas = make([]barisKelas, 0)
 		q := h.db.Model(&models.Kelas{}).
-			Select("id", "kode", "nama", "tingkat", "jurusan_id", "semester_id").
-			Order("kode")
+			Select("kelas.id", "kelas.kode", "kelas.nama", "kelas.tingkat", "kelas.jurusan_id", "kelas.semester_id").
+			Order("kelas.kode")
+		if semID != uuid.Nil {
+			q = q.Where("kelas.semester_id = ?", semID)
+		}
 		if terbatasOK {
-			q = q.Where("jurusan_id = ?", terbatas)
+			kode, ada := kodeJurusanCache(h.db, terbatas)
+			if !ada {
+				return nil
+			}
+			q = q.Joins("JOIN jurusan ON jurusan.id = kelas.jurusan_id").
+				Where("jurusan.kode = ?", kode)
 		}
 		return q.Find(&kelas).Error
 	})
@@ -218,17 +238,28 @@ func (h *PengelolaMaster) bangunKatalog(terbatas uuid.UUID, terbatasOK bool) ([]
 	})
 	jalan(func() error {
 		ruangan = make([]barisRuangan, 0)
-		return h.db.Model(&models.Ruangan{}).
-			Select("id", "kode", "nama", "kapasitas", "tipe_ruangan", "aktif").
-			Order("kode").Find(&ruangan).Error
+		q := h.db.Model(&models.Ruangan{}).
+			Select("id", "kode", "nama", "kapasitas", "tipe_ruangan", "aktif", "semester_id").
+			Order("kode")
+		if semID != uuid.Nil {
+			q = q.Where("semester_id = ?", semID)
+		}
+		return q.Find(&ruangan).Error
 	})
 	jalan(func() error {
 		jurusan = make([]barisJurusan, 0)
 		q := h.db.Model(&models.Jurusan{}).
-			Select("id", "kode", "nama").
+			Select("id", "kode", "nama", "semester_id").
 			Order("kode")
+		if semID != uuid.Nil {
+			q = q.Where("semester_id = ?", semID)
+		}
 		if terbatasOK {
-			q = q.Where("id = ?", terbatas)
+			kode, ada := kodeJurusanCache(h.db, terbatas)
+			if !ada {
+				return nil
+			}
+			q = q.Where("kode = ?", kode)
 		}
 		return q.Find(&jurusan).Error
 	})
@@ -281,7 +312,7 @@ func mengubahKatalog(path string) bool {
 			continue
 		}
 		switch p {
-		case "jurusan", "mata-pelajaran", "kelas", "ruangan", "jam-pelajaran":
+		case "jurusan", "mata-pelajaran", "kelas", "ruangan", "jam-pelajaran", "plotting", "semester":
 			return true
 		case "guru":
 			return !adaSegmen(bagian[i:], "hari-libur")

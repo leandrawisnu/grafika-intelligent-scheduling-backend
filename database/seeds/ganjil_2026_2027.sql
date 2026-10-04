@@ -1,4 +1,4 @@
--- Seed skeleton: Semester Ganjil 2026/2027 (SMKN 4 Malang)
+-- Seed skeleton: Semester Demo - Ganjil 2026/2027 (SMKN 4 Malang)
 -- Master + jadwal_semester + semua kelas terdaftar, tanpa slot_jadwal.
 -- Idempotent: aman dijalankan ulang.
 
@@ -6,17 +6,19 @@ BEGIN;
 
 -- Tahun ajaran & semester
 INSERT INTO tahun_ajaran (nama, tanggal_mulai, tanggal_selesai, aktif)
-VALUES ('2026/2027', '2026-07-01', '2027-06-30', true)
+VALUES ('Demo - 2026/2027', '2026-07-01', '2027-06-30', true)
 ON CONFLICT (nama) DO NOTHING;
 
 INSERT INTO semester (tahun_ajaran_id, nama, semester_ke, tanggal_mulai, tanggal_selesai, aktif)
-SELECT ta.id, 'Ganjil 2026/2027', 1, '2026-07-01', '2026-12-31', true
+SELECT ta.id, 'Demo - Ganjil 2026/2027', 1, '2026-07-01', '2026-12-31', true
 FROM tahun_ajaran ta
-WHERE ta.nama = '2026/2027'
+WHERE ta.nama = 'Demo - 2026/2027'
 ON CONFLICT (tahun_ajaran_id, semester_ke) DO NOTHING;
 
--- 8 jurusan
-INSERT INTO jurusan (kode, nama) VALUES
+-- 8 jurusan (per-semester: semester_id wajib, unik per semester)
+INSERT INTO jurusan (kode, nama, semester_id)
+SELECT v.kode, v.nama, sem.id
+FROM (VALUES
   ('DKV', 'Desain Komunikasi Visual'),
   ('ANI', 'Animasi'),
   ('TG',  'Teknik Grafika'),
@@ -25,7 +27,10 @@ INSERT INTO jurusan (kode, nama) VALUES
   ('PH',  'Perhotelan'),
   ('TL',  'Teknik Logistik'),
   ('TM',  'Teknik Mekatronika')
-ON CONFLICT (kode) DO NOTHING;
+) AS v(kode, nama)
+JOIN semester sem ON sem.semester_ke = 1
+JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id AND ta.nama = 'Demo - 2026/2027'
+ON CONFLICT (semester_id, kode) DO NOTHING;
 
 -- Jam pelajaran (grid skeleton)
 INSERT INTO jam_pelajaran (jam_ke, waktu_mulai, waktu_selesai, istirahat) VALUES
@@ -42,8 +47,10 @@ INSERT INTO jam_pelajaran (jam_ke, waktu_mulai, waktu_selesai, istirahat) VALUES
   (10, '13:45', '14:30', false)
 ON CONFLICT (jam_ke) DO NOTHING;
 
--- Ruangan dari PDF
-INSERT INTO ruangan (kode, nama, kapasitas, tipe_ruangan, aktif) VALUES
+-- Ruangan dari PDF (per-semester: semester_id wajib, unik per semester)
+INSERT INTO ruangan (kode, nama, kapasitas, tipe_ruangan, aktif, semester_id)
+SELECT v.kode, v.nama, v.kapasitas, v.tipe_ruangan, v.aktif, sem.id
+FROM (VALUES
   ('R-DKV-1',  'R. DKV 1',  36, 'kelas', true),
   ('R-DKV-2',  'R. DKV 2',  36, 'kelas', true),
   ('R-DKV-3',  'R. DKV 3',  36, 'kelas', true),
@@ -75,7 +82,10 @@ INSERT INTO ruangan (kode, nama, kapasitas, tipe_ruangan, aktif) VALUES
   ('R-33',  'R. 33',  36, 'kelas', true),
   ('R-34',  'R. 34',  36, 'kelas', true),
   ('R-35',  'R. 35',  36, 'kelas', true)
-ON CONFLICT (kode) DO NOTHING;
+) AS v(kode, nama, kapasitas, tipe_ruangan, aktif)
+JOIN semester sem ON sem.semester_ke = 1
+JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id AND ta.nama = 'Demo - 2026/2027'
+ON CONFLICT (semester_id, kode) DO NOTHING;
 
 -- 50 kelas (X & XI, semua jurusan — dari PDF)
 INSERT INTO kelas (kode, nama, tingkat, jurusan_id, semester_id)
@@ -105,16 +115,16 @@ FROM (VALUES
   ('XI-TM-A',  'XI TM A',  11, 'TM'),  ('XI-TM-B',  'XI TM B',  11, 'TM')
 ) AS v(kode, nama, tingkat, jur_kode)
 JOIN jurusan j ON j.kode = v.jur_kode
-JOIN semester sem ON sem.semester_ke = 1
-JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id AND ta.nama = '2026/2027'
-ON CONFLICT (kode) DO NOTHING;
+JOIN semester sem ON sem.id = j.semester_id
+JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id AND ta.nama = 'Demo - 2026/2027'
+ON CONFLICT (semester_id, kode) DO NOTHING;
 
 -- Jadwal semester (satu workbook sekolah)
 INSERT INTO jadwal_semester (semester_id, status, bebas_konflik)
 SELECT sem.id, 'draf', false
 FROM semester sem
 JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id
-WHERE ta.nama = '2026/2027' AND sem.semester_ke = 1
+WHERE ta.nama = 'Demo - 2026/2027' AND sem.semester_ke = 1
 ON CONFLICT (semester_id) DO NOTHING;
 
 -- Semua jurusan terdaftar di jadwal
@@ -123,8 +133,8 @@ SELECT js.id, j.id
 FROM jadwal_semester js
 JOIN semester sem ON sem.id = js.semester_id
 JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id
-JOIN jurusan j ON j.kode IN ('DKV', 'ANI', 'TG', 'TKJ', 'RPL', 'PH', 'TL', 'TM')
-WHERE ta.nama = '2026/2027' AND sem.semester_ke = 1
+JOIN jurusan j ON j.semester_id = sem.id AND j.kode IN ('DKV', 'ANI', 'TG', 'TKJ', 'RPL', 'PH', 'TL', 'TM')
+WHERE ta.nama = 'Demo - 2026/2027' AND sem.semester_ke = 1
 ON CONFLICT (jadwal_semester_id, jurusan_id) DO NOTHING;
 
 -- Jadwal kelas aktif per kelas (versi 1, slot kosong)
@@ -134,7 +144,7 @@ FROM kelas k
 JOIN semester sem ON sem.id = k.semester_id
 JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id
 JOIN jadwal_semester js ON js.semester_id = sem.id
-WHERE ta.nama = '2026/2027' AND sem.semester_ke = 1
+WHERE ta.nama = 'Demo - 2026/2027' AND sem.semester_ke = 1
 ON CONFLICT (jadwal_semester_id, kelas_id, versi) DO NOTHING;
 
 COMMIT;

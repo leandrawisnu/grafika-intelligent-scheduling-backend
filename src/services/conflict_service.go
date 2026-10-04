@@ -213,35 +213,43 @@ func (s *LayananKonflik) cekGuruKelebihanJam(jsID uuid.UUID, slots []models.Slot
 }
 
 func (s *LayananKonflik) cekGuruHariLibur(jsID uuid.UUID, slots []models.SlotJadwal) []models.Konflik {
+	// Satu query: indeks (guru, hari) dari semua hari libur.
+	// Query per slot (N+1) bikin deteksi lambat pada jadwal besar.
+	var libur []models.HariLiburGuru
+	if err := s.db.Select("guru_id", "hari_id").Find(&libur).Error; err != nil {
+		return nil
+	}
+	indeks := make(map[string]struct{}, len(libur))
+	for _, l := range libur {
+		indeks[l.GuruID.String()+"|"+l.HariID.String()] = struct{}{}
+	}
+
 	var konflik []models.Konflik
 
 	for _, slot := range slots {
 		if slot.GuruID == uuid.Nil {
 			continue
 		}
-		var count int64
-		s.db.Model(&models.HariLiburGuru{}).
-			Where("guru_id = ? AND hari_id = ?", slot.GuruID, slot.HariID).
-			Count(&count)
-		if count > 0 {
-			namaGuru := "Tidak Diketahui"
-			namaHari := "Tidak Diketahui"
-			if slot.Guru != nil {
-				namaGuru = slot.Guru.NamaLengkap
-			}
-			if slot.Hari != nil {
-				namaHari = slot.Hari.Nama
-			}
-			konflik = append(konflik, models.Konflik{
-				JadwalSemesterID: jsID,
-				TipeKonflik:      "guru_hari_libur",
-				TingkatKeparahan: "kesalahan",
-				SlotAID:          &slot.ID,
-				GuruID:           &slot.GuruID,
-				Deskripsi:        fmt.Sprintf("Guru %s dijadwalkan pada hari %s yang merupakan hari liburnya", namaGuru, namaHari),
-				TerdeteksiPada:   time.Now(),
-			})
+		if _, ada := indeks[slot.GuruID.String()+"|"+slot.HariID.String()]; !ada {
+			continue
 		}
+		namaGuru := "Tidak Diketahui"
+		namaHari := "Tidak Diketahui"
+		if slot.Guru != nil {
+			namaGuru = slot.Guru.NamaLengkap
+		}
+		if slot.Hari != nil {
+			namaHari = slot.Hari.Nama
+		}
+		konflik = append(konflik, models.Konflik{
+			JadwalSemesterID: jsID,
+			TipeKonflik:      "guru_hari_libur",
+			TingkatKeparahan: "kesalahan",
+			SlotAID:          &slot.ID,
+			GuruID:           &slot.GuruID,
+			Deskripsi:        fmt.Sprintf("Guru %s dijadwalkan pada hari %s yang merupakan hari liburnya", namaGuru, namaHari),
+			TerdeteksiPada:   time.Now(),
+		})
 	}
 	return konflik
 }

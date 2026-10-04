@@ -4,7 +4,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/grafika-scheduling/backend/src/models"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -29,30 +28,10 @@ func Connect(dsn string) *gorm.DB {
 	return db
 }
 
+// AutoMigrate deprecated: schema dikelola eksklusif via migrate CLI
+// (make migrate-init / migrate-up) dan database/migrations/*.sql.
+// Jangan dipakai — dipertahankan agar kode lama yang memanggilnya tetap kompilasi.
 func AutoMigrate(db *gorm.DB) error {
-	return db.AutoMigrate(
-		&models.TahunAjaran{},
-		&models.Semester{},
-		&models.Jurusan{},
-		&models.Pengguna{},
-		&models.Sesi{},
-		&models.Guru{},
-		&models.MataPelajaran{},
-		&models.Kelas{},
-		&models.Ruangan{},
-		&models.Hari{},
-		&models.JamPelajaran{},
-		&models.HariLiburGuru{},
-		&models.JadwalSemester{},
-		&models.JadwalSemesterJurusan{},
-		&models.JadwalKelas{},
-		&models.SlotJadwal{},
-		&models.Konflik{},
-		&models.ResolusiAI{},
-		&models.LogAuditJadwal{},
-		&models.SesiChatAI{},
-		&models.PesanChatAI{},
-		&models.FeedbackChatAI{},
-		&models.MemoriChatbot{},
-	)
+	_ = db
+	return nil
 }

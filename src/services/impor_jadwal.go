@@ -58,7 +58,7 @@ func (s *LayananJadwal) KatalogImpor(semesterID uuid.UUID) (KatalogCocok, error)
 		return KatalogCocok{}, err
 	}
 	var ruang []models.Ruangan
-	if err := s.db.Find(&ruang).Error; err != nil {
+	if err := s.db.Where("semester_id = ?", semesterID).Find(&ruang).Error; err != nil {
 		return KatalogCocok{}, err
 	}
 
@@ -220,8 +220,12 @@ func pastikanReferensi(tx *gorm.DB, semesterID uuid.UUID, b BarisImpor) error {
 		}
 	}
 	if b.RuanganID != nil {
-		if err := tx.First(&models.Ruangan{}, "id = ?", *b.RuanganID).Error; err != nil {
+		var ruangan models.Ruangan
+		if err := tx.First(&ruangan, "id = ?", *b.RuanganID).Error; err != nil {
 			return fmt.Errorf("ruangan tidak ditemukan")
+		}
+		if ruangan.SemesterID != semesterID {
+			return fmt.Errorf("ruangan %s tidak termasuk semester jadwal ini", ruangan.Nama)
 		}
 	}
 	return nil

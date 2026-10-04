@@ -76,6 +76,23 @@ type BuatSlotRequest struct {
 	Terkunci        bool   `json:"terkunci"`
 }
 
+// Plotting (rencana penugasan per jam per semester)
+type BuatPlottingRequest struct {
+	KelasID         string `json:"kelas_id"`
+	HariID          string `json:"hari_id"`
+	JamPelajaranID  string `json:"jam_pelajaran_id"`
+	MataPelajaranID string `json:"mata_pelajaran_id"`
+	GuruID          string `json:"guru_id"`
+	RuanganID       string `json:"ruangan_id,omitempty"`
+}
+
+// Salin semester (snapshot master + plotting ke semester baru, tanpa slot)
+type SalinSemesterRequest struct {
+	TahunAjaranID string `json:"tahun_ajaran_id"`
+	SemesterKe    int16  `json:"semester_ke"`
+	Nama          string `json:"nama"`
+}
+
 // ML service proxy
 type PrediksiKonflikRequest struct {
 	JadwalSemesterID string        `json:"jadwal_semester_id"`

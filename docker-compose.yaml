@@ -12,6 +12,9 @@
 #
 # Postgres saja (kompatibel make db-up):
 #   docker compose -f docker-compose.db.yaml up -d
+#
+# DB eksternal (bukan postgres container): set DB_HOST/DB_PORT/DB_USER/
+# DB_PASSWORD/DB_NAME di .env — nilai .env menimpa default compose.
 
 name: gis-backend
 
@@ -75,8 +78,8 @@ services:
     environment:
       APP_HOST: 0.0.0.0
       APP_PORT: ${APP_PORT:-8080}
-      DB_HOST: postgres
-      DB_PORT: 5432
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
       DB_USER: ${DB_USER:-grafika}
       DB_PASSWORD: ${DB_PASSWORD:-grafika_dev}
       DB_NAME: ${DB_NAME:-grafika}
