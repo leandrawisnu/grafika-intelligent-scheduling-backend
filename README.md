@@ -59,22 +59,6 @@ docker compose up -d --build
 
 `DB_HOST=host.docker.internal` di container; port DB mengikuti `.env`.
 
-## Coolify (backend only)
-
-Polyrepo ini deploy ke Coolify per-folder — backend pakai `docker-compose.coolify.yaml`
-(isinya 3 service internal: `backend` + `postgres` + `minio`, tanpa
-`container_name`/`ports`, data persisten di volume `gis_pgdata`/`gis_minio`).
-
-1. Coolify → New Resource → Docker Compose → pilih repo + branch.
-2. Base Directory arahkan ke `grafika-intelligent-scheduling-backend/`,
-   Compose file: `docker-compose.coolify.yaml`.
-3. Environment Variables: copy dari `.env.coolify.example`
-   (wajib: `DB_PASSWORD`, `MINIO_ROOT_PASSWORD`).
-4. Domain → service `backend`, port `8080`. Cek via `/health`.
-5. Deploy — migrasi jalan otomatis via `docker-entrypoint.sh`,
-   bucket MinIO dibuat otomatis oleh backend.
-   Set `GIS_SKIP_MIGRATE=true` untuk skip bila perlu.
-
 ## API
 
 - `GET /health`
