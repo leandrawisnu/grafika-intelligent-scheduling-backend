@@ -46,3 +46,29 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    needs: build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy ke VM
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          port: ${{ secrets.VM_PORT || 22 }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          host_key: ${{ secrets.VM_KNOWN_HOSTS }}
+          envs: VM_DEPLOY_DIR
+          script: |
+            set -e
+            DIR="${VM_DEPLOY_DIR:-$HOME/grafika-intelligent-scheduling-backend}"
+            if [ ! -d "$DIR/.git" ]; then
+              git clone https://github.com/leandrawisnu/grafika-intelligent-scheduling-backend.git "$DIR"
+            fi
+            cd "$DIR"
+            git fetch origin
+            git checkout -f main
+            git reset --hard origin/main
+            docker compose up -d --build
