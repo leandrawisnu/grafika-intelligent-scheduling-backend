@@ -44,39 +44,42 @@ export function setup() {
     throw new Error("Detail jadwal tidak mengembalikan semester_id");
   }
 
-  // Tahun ajaran khusus stress supaya (tahun_ajaran, semester_ke) unik per run.
-  const runId = `stress-${new Date()
-    .toISOString()
-    .replace(/[-:T.]/g, "")
-    .slice(0, 14)}`;
-  const ta = http.post(
-    apiUrl(cfg.baseUrl, "/api/v1/tahun-ajaran"),
-    JSON.stringify({ nama: runId }),
-    { headers, tags: { name: "setup_tahun_ajaran" } }
-  );
-  if (ta.status !== 201) {
-    throw new Error(`Gagal buat tahun ajaran stress (${ta.status}): ${ta.body}`);
-  }
-
-  return {
-    cfg,
-    token,
-    ...targets,
-    semesterSumber,
-    tahunAjaranId: ta.json("id"),
-    runId,
-  };
+  return { cfg, token, ...targets, semesterSumber };
 }
 
 export default function (data) {
   const headers = sessionHeaders(data.token);
 
+  // Setiap iterasi = satu rollover penuh: tahun ajaran baru (nama unik)
+  // lalu salin semester_ke=1 di bawahnya. Sebuah tahun ajaran hanya punya
+  // semester_ke 1 dan 2, jadi tahun ajaran tidak bisa dipakai ulang.
+  const runId = `stress-${new Date()
+    .toISOString()
+    .replace(/[-:T.]/g, "")
+    .slice(0, 14)}-${__ITER}`;
+  const ta = http.post(
+    apiUrl(data.cfg.baseUrl, "/api/v1/tahun-ajaran"),
+    JSON.stringify({
+      nama: runId,
+      tanggal_mulai: "2026-07-01",
+      tanggal_selesai: "2027-06-30",
+    }),
+    { headers, tags: { name: "setup_tahun_ajaran" } }
+  );
+  if (ta.status !== 201) {
+    check(ta, {
+      "setup tahun ajaran 2xx": (r) => r.status >= 200 && r.status < 300,
+    });
+    sleep(1);
+    return;
+  }
+
   const salin = http.post(
     apiUrl(data.cfg.baseUrl, `/api/v1/semester/${data.semesterSumber}/salin`),
     JSON.stringify({
-      tahun_ajaran_id: data.tahunAjaranId,
+      tahun_ajaran_id: ta.json("id"),
       semester_ke: 1,
-      nama: `${data.runId}-${__ITER}`,
+      nama: `${runId}-salin`,
     }),
     { headers, tags: { name: "rollover_salin" } }
   );

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -13,7 +14,10 @@ import (
 	"github.com/grafika-scheduling/backend/src/models"
 	"github.com/grafika-scheduling/backend/src/services"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
+
+var errKonflikSudahSelesai = errors.New("konflik sudah diselesaikan")
 
 type PengelolaJadwal struct {
 	layananJadwal  *services.LayananJadwal
@@ -680,43 +684,66 @@ func (h *PengelolaJadwal) PrediksiKonflik(c *fiber.Ctx) error {
 // ========== Resolusi AI ==========
 
 func (h *PengelolaJadwal) SelesaikanKonflik(c *fiber.Ctx) error {
-	konflikID, _ := uuid.Parse(c.Params("id"))
-
-	var konflik models.Konflik
-	if h.db.First(&konflik, "id = ?", konflikID).Error != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "konflik tidak ditemukan"})
-	}
-
-	usulan, err := h.layananKonflik.UsulkanPerbaikan(konflik)
+	konflikID, err := uuid.Parse(c.Params("id"))
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return c.Status(400).JSON(fiber.Map{"error": "id konflik tidak valid"})
 	}
 
-	h.db.Where("konflik_id = ? AND diterima = ?", konflikID, false).Delete(&models.ResolusiAI{})
+	alternatif := make([]fiber.Map, 0)
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		var konflik models.Konflik
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&konflik, "id = ?", konflikID).Error; err != nil {
+			return err
+		}
+		if konflik.Terselesaikan {
+			return errKonflikSudahSelesai
+		}
 
-	alternatif := make([]fiber.Map, 0, len(usulan))
-	for _, u := range usulan {
-		perubahanJSON, err := json.Marshal(u.Perubahan)
+		usulan, err := h.layananKonflik.UsulkanPerbaikan(konflik)
 		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "gagal menyimpan usulan"})
+			return err
 		}
-		baris := models.ResolusiAI{
-			KonflikID:           konflikID,
-			JadwalSemesterID:    konflik.JadwalSemesterID,
-			Peringkat:           int16(u.Peringkat),
-			SkorKeyakinan:       u.Keyakinan,
-			UsulanPerubahanJSON: string(perubahanJSON),
-			Penjelasan:          u.Penjelasan,
+
+		if err := tx.Where("konflik_id = ? AND diterima = ?", konflikID, false).
+			Delete(&models.ResolusiAI{}).Error; err != nil {
+			return err
 		}
-		if err := h.db.Create(&baris).Error; err != nil {
-			return c.Status(500).JSON(fiber.Map{"error": "gagal menyimpan usulan"})
+
+		alternatif = make([]fiber.Map, 0, len(usulan))
+		for _, u := range usulan {
+			perubahanJSON, err := json.Marshal(u.Perubahan)
+			if err != nil {
+				return errors.New("gagal menyimpan usulan")
+			}
+			baris := models.ResolusiAI{
+				KonflikID:           konflikID,
+				JadwalSemesterID:    konflik.JadwalSemesterID,
+				Peringkat:           int16(u.Peringkat),
+				SkorKeyakinan:       u.Keyakinan,
+				UsulanPerubahanJSON: string(perubahanJSON),
+				Penjelasan:          u.Penjelasan,
+			}
+			if err := tx.Create(&baris).Error; err != nil {
+				return err
+			}
+			alternatif = append(alternatif, fiber.Map{
+				"id":         baris.ID.String(),
+				"peringkat":  u.Peringkat,
+				"label":      u.Label,
+				"penjelasan": u.Penjelasan,
+			})
 		}
-		alternatif = append(alternatif, fiber.Map{
-			"id":         baris.ID.String(),
-			"peringkat":  u.Peringkat,
-			"label":      u.Label,
-			"penjelasan": u.Penjelasan,
-		})
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, errKonflikSudahSelesai) {
+			return c.Status(409).JSON(fiber.Map{"error": "konflik sudah diselesaikan"})
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(404).JSON(fiber.Map{"error": "konflik tidak ditemukan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
 	return c.JSON(fiber.Map{"alternatif": alternatif})
@@ -730,54 +757,108 @@ func (h *PengelolaJadwal) DaftarResolusi(c *fiber.Ctx) error {
 }
 
 func (h *PengelolaJadwal) TerimaResolusi(c *fiber.Ctx) error {
-	resolusiID, _ := uuid.Parse(c.Params("id"))
-
-	var resolusi models.ResolusiAI
-	if h.db.First(&resolusi, "id = ?", resolusiID).Error != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "resolusi tidak ditemukan"})
+	resolusiID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id resolusi tidak valid"})
 	}
 
-	var perubahan []map[string]interface{}
-	json.Unmarshal([]byte(resolusi.UsulanPerubahanJSON), &perubahan)
-
-	for _, ubah := range perubahan {
-		aksi, _ := ubah["action"].(string)
-		slotIDStr, _ := ubah["slot_id"].(string)
-		slotID, _ := uuid.Parse(slotIDStr)
-
-		switch aksi {
-		case "reassign_teacher":
-			guruIDStr, _ := ubah["new_teacher_id"].(string)
-			guruID, _ := uuid.Parse(guruIDStr)
-			h.layananJadwal.TugaskanGuru(slotID, guruID)
-		case "change_room":
-			ruangIDStr, _ := ubah["new_room_id"].(string)
-			ruangID, _ := uuid.Parse(ruangIDStr)
-			h.layananJadwal.PerbaruiSlot(slotID, map[string]interface{}{"ruangan_id": ruangID})
-		case "change_time_slot":
-			jamIDStr, _ := ubah["new_time_slot_id"].(string)
-			jamID, _ := uuid.Parse(jamIDStr)
-			h.layananJadwal.PerbaruiSlot(slotID, map[string]interface{}{"jam_pelajaran_id": jamID})
-		case "swap_teachers":
-			slotBIDStr, _ := ubah["swap_with_slot_id"].(string)
-			slotBID, _ := uuid.Parse(slotBIDStr)
-			var slotA, slotB models.SlotJadwal
-			h.db.First(&slotA, "id = ?", slotID)
-			h.db.First(&slotB, "id = ?", slotBID)
-			h.layananJadwal.TugaskanGuru(slotID, slotB.GuruID)
-			h.layananJadwal.TugaskanGuru(slotBID, slotA.GuruID)
+	var jadwalSemesterID uuid.UUID
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		var resolusi models.ResolusiAI
+		if err := tx.First(&resolusi, "id = ?", resolusiID).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errKonflikSudahSelesai
+			}
+			return err
 		}
-	}
+		if resolusi.Diterima {
+			return errKonflikSudahSelesai
+		}
 
-	h.db.Model(&resolusi).Update("diterima", true)
-	h.db.Model(&models.Konflik{}).Where("id = ?", resolusi.KonflikID).
-		Updates(map[string]interface{}{
+		var konflik models.Konflik
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
+			First(&konflik, "id = ?", resolusi.KonflikID).Error; err != nil {
+			return err
+		}
+		if konflik.Terselesaikan {
+			return errKonflikSudahSelesai
+		}
+
+		var perubahan []map[string]interface{}
+		if err := json.Unmarshal([]byte(resolusi.UsulanPerubahanJSON), &perubahan); err != nil {
+			return errors.New("usulan tidak valid")
+		}
+
+		layanan := services.NewLayananJadwal(tx)
+		for _, ubah := range perubahan {
+			aksi, _ := ubah["action"].(string)
+			slotIDStr, _ := ubah["slot_id"].(string)
+			slotID, _ := uuid.Parse(slotIDStr)
+
+			switch aksi {
+			case "reassign_teacher":
+				guruIDStr, _ := ubah["new_teacher_id"].(string)
+				guruID, _ := uuid.Parse(guruIDStr)
+				if _, err := layanan.TugaskanGuru(slotID, guruID); err != nil {
+					return err
+				}
+			case "change_room":
+				ruangIDStr, _ := ubah["new_room_id"].(string)
+				ruangID, _ := uuid.Parse(ruangIDStr)
+				if _, err := layanan.PerbaruiSlot(slotID, map[string]interface{}{"ruangan_id": ruangID}); err != nil {
+					return err
+				}
+			case "change_time_slot":
+				jamIDStr, _ := ubah["new_time_slot_id"].(string)
+				jamID, _ := uuid.Parse(jamIDStr)
+				if _, err := layanan.PerbaruiSlot(slotID, map[string]interface{}{"jam_pelajaran_id": jamID}); err != nil {
+					return err
+				}
+			case "swap_teachers":
+				slotBIDStr, _ := ubah["swap_with_slot_id"].(string)
+				slotBID, _ := uuid.Parse(slotBIDStr)
+				var slotA, slotB models.SlotJadwal
+				if err := tx.First(&slotA, "id = ?", slotID).Error; err != nil {
+					return err
+				}
+				if err := tx.First(&slotB, "id = ?", slotBID).Error; err != nil {
+					return err
+				}
+				if _, err := layanan.TugaskanGuru(slotID, slotB.GuruID); err != nil {
+					return err
+				}
+				if _, err := layanan.TugaskanGuru(slotBID, slotA.GuruID); err != nil {
+					return err
+				}
+			}
+		}
+
+		sekarang := time.Now()
+		if err := tx.Model(&resolusi).Update("diterima", true).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&konflik).Updates(map[string]interface{}{
 			"terselesaikan":      true,
 			"diselesaikan_oleh":  "ai",
-			"terselesaikan_pada": time.Now(),
-		})
+			"terselesaikan_pada": sekarang,
+		}).Error; err != nil {
+			return err
+		}
 
-	h.layananKonflik.DeteksiKonflik(resolusi.JadwalSemesterID)
+		jadwalSemesterID = resolusi.JadwalSemesterID
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, errKonflikSudahSelesai) {
+			return c.Status(409).JSON(fiber.Map{"error": "konflik sudah diselesaikan"})
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(409).JSON(fiber.Map{"error": "konflik sudah diselesaikan"})
+		}
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	h.layananKonflik.DeteksiKonflik(jadwalSemesterID)
 
 	return c.JSON(fiber.Map{"status": "diterapkan"})
 }

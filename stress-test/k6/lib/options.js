@@ -1,5 +1,11 @@
 /** Shared load profiles and SLO thresholds for GIS API tests. */
 
+// Register response_size_bytes as a custom Trend (see smoke-metrics.js).
+// k6 >= 2.x rejects thresholds on metrics that are not in the registry
+// at init — the built-in response_size_bytes no longer exists, so every
+// scenario needs this registration for the per-endpoint size thresholds.
+import "./smoke-metrics.js";
+
 export const stagesSmoke = [
   { duration: "30s", target: 1 },
 ];

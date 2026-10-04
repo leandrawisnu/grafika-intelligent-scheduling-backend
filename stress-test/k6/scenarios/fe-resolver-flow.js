@@ -20,6 +20,12 @@ export const options = {
 let konflikCache = [];
 let idxKonflik = 0;
 
+const resolverWriteStatuses = [200, 201, 202, 204, 409];
+
+function resolverOk(status) {
+  return (status >= 200 && status < 300) || status === 409;
+}
+
 function muatKonflik(baseUrl, opts, jsId) {
   const res = http.get(
     apiUrl(baseUrl, `/api/v1/jadwal-semester/${jsId}/konflik`),
@@ -92,12 +98,21 @@ export default function (data) {
   const selesai = http.post(
     apiUrl(data.cfg.baseUrl, `/api/v1/konflik/${konflikId}/selesaikan`),
     null,
-    { ...opts, tags: { name: "resolver_selesaikan" } }
+    {
+      ...opts,
+      tags: { name: "resolver_selesaikan" },
+      expectedStatuses: resolverWriteStatuses,
+    }
   );
   check(selesai, {
-    "selesaikan 2xx": (r) => r.status >= 200 && r.status < 300,
+    "selesaikan 2xx atau 409": (r) => resolverOk(r.status),
   });
-  if (selesai.status < 200 || selesai.status >= 300) return;
+  if (selesai.status === 409) {
+    konflikCache = [];
+    sleep(1 + Math.random());
+    return;
+  }
+  if (!resolverOk(selesai.status)) return;
 
   let alternatif = [];
   try {
@@ -121,10 +136,14 @@ export default function (data) {
     const terima = http.post(
       apiUrl(data.cfg.baseUrl, `/api/v1/resolusi/${alternatif[0].id}/terima`),
       null,
-      { ...opts, tags: { name: "resolver_terima" } }
+      {
+        ...opts,
+        tags: { name: "resolver_terima" },
+        expectedStatuses: resolverWriteStatuses,
+      }
     );
     check(terima, {
-      "terima 2xx": (r) => r.status >= 200 && r.status < 300,
+      "terima 2xx atau 409": (r) => resolverOk(r.status),
     });
     konflikCache = [];
   }
