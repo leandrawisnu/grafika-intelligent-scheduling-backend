@@ -64,7 +64,7 @@ func New(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, cfg *con
 	pengelolaJadwal := handlers.NewPengelolaJadwal(db, mlClient, objek, rateLimiter.Handler())
 	pengelolaJadwal.DaftarkanRute(v1)
 
-	pengelolaImporAI := handlers.NewPengelolaImporAI(db, mlClient, objek)
+	pengelolaImporAI := handlers.NewPengelolaImporAI(db, mlClient, objek, rateLimiter.Handler())
 	pengelolaImporAI.DaftarkanRute(v1)
 
 	return app

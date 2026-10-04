@@ -23,24 +23,33 @@ import (
 const batasBerkasImporAI = 15 * 1024 * 1024
 
 type PengelolaImporAI struct {
-	db      *gorm.DB
-	layanan *services.LayananImporAI
-	objek   *storage.Client
+	db          *gorm.DB
+	layanan     *services.LayananImporAI
+	objek       *storage.Client
+	rateLimiter fiber.Handler
 }
 
-func NewPengelolaImporAI(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client) *PengelolaImporAI {
+func NewPengelolaImporAI(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, rateLimiter fiber.Handler) *PengelolaImporAI {
+	if rateLimiter == nil {
+		// Pass-through when the limiter is disabled.
+		rateLimiter = func(c *fiber.Ctx) error { return c.Next() }
+	}
 	return &PengelolaImporAI{
-		db:      db,
-		layanan: services.NewLayananImporAI(db, mlClient, objek),
-		objek:   objek,
+		db:          db,
+		layanan:     services.NewLayananImporAI(db, mlClient, objek),
+		objek:       objek,
+		rateLimiter: rateLimiter,
 	}
 }
 
 func (h *PengelolaImporAI) DaftarkanRute(r fiber.Router) {
-	r.Post("/dokumen-impor", h.Buat)
+	// Unggah/analisis, penerapan, dan ulangi = endpoint berat (parse LLM +
+	// transaksi); polling status sengaja tidak dibatasi agar UI bisa
+	// memantau progres tanpa terkena 429.
+	r.Post("/dokumen-impor", h.rateLimiter, h.Buat)
 	r.Get("/dokumen-impor/:id", h.Ambil)
-	r.Post("/dokumen-impor/:id/terapkan", h.Terapkan)
-	r.Post("/dokumen-impor/:id/ulangi", h.Ulangi)
+	r.Post("/dokumen-impor/:id/terapkan", h.rateLimiter, h.Terapkan)
+	r.Post("/dokumen-impor/:id/ulangi", h.rateLimiter, h.Ulangi)
 }
 
 func (h *PengelolaImporAI) Buat(c *fiber.Ctx) error {
