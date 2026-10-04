@@ -160,53 +160,80 @@ func (h *PengelolaJadwal) RingkasanJadwal(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "id jadwal tidak valid"})
 	}
 
-	type hitung struct {
-		Jumlah    int64
-		TanpaGuru int64
-	}
-	var hasil hitung
-	q := h.db.Table("slot_jadwal").
-		Select("COUNT(*) AS jumlah, COUNT(*) FILTER (WHERE slot_jadwal.guru_id IS NULL) AS tanpa_guru").
-		Joins("JOIN jadwal_kelas ON jadwal_kelas.id = slot_jadwal.jadwal_kelas_id").
-		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", id, true)
+	jurusanFilter := ""
+	args := []interface{}{id}
 	if terbatas, ok := auth.Terbatas(c); ok {
-		q = q.Where("jadwal_kelas.jurusan_id = ?", terbatas)
+		jurusanFilter = " AND jk.jurusan_id = $2"
+		args = append(args, terbatas)
 	}
-	if err := q.Scan(&hasil).Error; err != nil {
+
+	sql := `
+WITH slot AS (
+  SELECT
+    COUNT(*)::bigint AS jumlah,
+    COUNT(*) FILTER (WHERE s.guru_id IS NULL)::bigint AS tanpa_guru
+  FROM slot_jadwal s
+  INNER JOIN jadwal_kelas jk ON jk.id = s.jadwal_kelas_id
+  WHERE jk.jadwal_semester_id = $1 AND jk.is_active = true` + jurusanFilter + `
+),
+konflik_open AS (
+  SELECT tingkat_keparahan, tipe_konflik
+  FROM konflik
+  WHERE jadwal_semester_id = $1 AND terselesaikan = false
+),
+konflik_agg AS (
+  SELECT
+    COUNT(*)::bigint AS terbuka,
+    COUNT(*) FILTER (WHERE tingkat_keparahan = 'kesalahan')::bigint AS kesalahan,
+    COUNT(*) FILTER (WHERE tingkat_keparahan = 'peringatan')::bigint AS peringatan
+  FROM konflik_open
+)
+SELECT
+  slot.jumlah AS jumlah_slot,
+  slot.tanpa_guru AS jumlah_tanpa_guru,
+  konflik_agg.terbuka AS jumlah_konflik_terbuka,
+  konflik_agg.kesalahan AS jumlah_kesalahan,
+  konflik_agg.peringatan AS jumlah_peringatan,
+  COALESCE(
+    (
+      SELECT json_agg(json_build_object('tipe_konflik', tipe_konflik, 'jumlah', jumlah) ORDER BY jumlah DESC)
+      FROM (
+        SELECT tipe_konflik, COUNT(*)::bigint AS jumlah
+        FROM konflik_open
+        GROUP BY tipe_konflik
+      ) t
+    ),
+    '[]'::json
+  ) AS konflik_per_tipe
+FROM slot
+CROSS JOIN konflik_agg`
+
+	type ringkasanBaris struct {
+		JumlahSlot           int64
+		JumlahTanpaGuru      int64
+		JumlahKonflikTerbuka int64
+		JumlahKesalahan      int64
+		JumlahPeringatan     int64
+		KonflikPerTipe       json.RawMessage
+	}
+	var baris ringkasanBaris
+	if err := h.db.Raw(sql, args...).Scan(&baris).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	type hitungKonflik struct {
-		Terbuka    int64
-		Kesalahan  int64
-		Peringatan int64
-	}
-	var konflik hitungKonflik
-	kq := h.db.Table("konflik").
-		Select(`COUNT(*) AS terbuka,
-			COUNT(*) FILTER (WHERE tingkat_keparahan = 'kesalahan') AS kesalahan,
-			COUNT(*) FILTER (WHERE tingkat_keparahan = 'peringatan') AS peringatan`).
-		Where("jadwal_semester_id = ? AND terselesaikan = ?", id, false)
-	if err := kq.Scan(&konflik).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
-	}
-
-	var perTipe []dto.KonflikPerTipe
-	if err := h.db.Table("konflik").
-		Select("tipe_konflik, COUNT(*) AS jumlah").
-		Where("jadwal_semester_id = ? AND terselesaikan = ?", id, false).
-		Group("tipe_konflik").
-		Order("jumlah DESC").
-		Scan(&perTipe).Error; err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	perTipe := []dto.KonflikPerTipe{}
+	if len(baris.KonflikPerTipe) > 0 && string(baris.KonflikPerTipe) != "null" {
+		if err := json.Unmarshal(baris.KonflikPerTipe, &perTipe); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
 	}
 
 	return c.JSON(fiber.Map{
-		"jumlah_slot":            hasil.Jumlah,
-		"jumlah_tanpa_guru":      hasil.TanpaGuru,
-		"jumlah_konflik_terbuka": konflik.Terbuka,
-		"jumlah_kesalahan":       konflik.Kesalahan,
-		"jumlah_peringatan":      konflik.Peringatan,
+		"jumlah_slot":            baris.JumlahSlot,
+		"jumlah_tanpa_guru":      baris.JumlahTanpaGuru,
+		"jumlah_konflik_terbuka": baris.JumlahKonflikTerbuka,
+		"jumlah_kesalahan":       baris.JumlahKesalahan,
+		"jumlah_peringatan":      baris.JumlahPeringatan,
 		"konflik_per_tipe":       perTipe,
 	})
 }
