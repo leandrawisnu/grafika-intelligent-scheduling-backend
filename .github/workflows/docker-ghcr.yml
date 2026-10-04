@@ -54,6 +54,9 @@ jobs:
     steps:
       - name: Deploy ke VM
         uses: appleboy/ssh-action@v1.2.0
+        env:
+          VM_DEPLOY_DIR: ${{ secrets.VM_DEPLOY_DIR }}
+          VM_DEPLOY_CMD: ${{ secrets.VM_DEPLOY_CMD }}
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
