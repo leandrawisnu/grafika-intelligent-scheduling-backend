@@ -10,12 +10,20 @@ type HasilValidasi struct {
 }
 
 type RingkasanKonflik struct {
-	ID            string `json:"id"`
-	Tipe          string `json:"tipe_konflik"`
-	Keparahan     string `json:"tingkat_keparahan"`
-	Deskripsi     string `json:"deskripsi"`
-	Terselesaikan bool   `json:"terselesaikan"`
-	Terdeteksi    string `json:"terdeteksi_pada"`
+	ID            string  `json:"id"`
+	Tipe          string  `json:"tipe_konflik"`
+	Keparahan     string  `json:"tingkat_keparahan"`
+	Deskripsi     string  `json:"deskripsi"`
+	Terselesaikan bool    `json:"terselesaikan"`
+	Terdeteksi    string  `json:"terdeteksi_pada"`
+	SlotAID       *string `json:"slot_a_id,omitempty"`
+	SlotBID       *string `json:"slot_b_id,omitempty"`
+	GuruID        *string `json:"guru_id,omitempty"`
+}
+
+type KonflikPerTipe struct {
+	Tipe   string `json:"tipe_konflik"`
+	Jumlah int64  `json:"jumlah"`
 }
 
 // Jadwal Semester

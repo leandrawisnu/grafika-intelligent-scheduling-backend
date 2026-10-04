@@ -44,15 +44,9 @@ export function runBootstrapBatch(baseUrl, jsId, requestOpts) {
       null,
       tagged("ringkasan"),
     ],
-    [
-      "GET",
-      apiUrl(baseUrl, `/api/v1/jadwal-semester/${jsId}/konflik`),
-      null,
-      tagged("konflik"),
-    ],
   ]);
 
-  const names = ["jadwal_list", "jadwal_detail", "jk_aktif_ringkas", "ringkasan", "konflik"];
+  const names = ["jadwal_list", "jadwal_detail", "jk_aktif_ringkas", "ringkasan"];
 
   for (let i = 0; i < responses.length; i++) {
     const res = responses[i];

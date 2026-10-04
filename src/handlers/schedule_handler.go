@@ -176,7 +176,39 @@ func (h *PengelolaJadwal) RingkasanJadwal(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
-	return c.JSON(fiber.Map{"jumlah_slot": hasil.Jumlah, "jumlah_tanpa_guru": hasil.TanpaGuru})
+	type hitungKonflik struct {
+		Terbuka    int64
+		Kesalahan  int64
+		Peringatan int64
+	}
+	var konflik hitungKonflik
+	kq := h.db.Table("konflik").
+		Select(`COUNT(*) AS terbuka,
+			COUNT(*) FILTER (WHERE tingkat_keparahan = 'kesalahan') AS kesalahan,
+			COUNT(*) FILTER (WHERE tingkat_keparahan = 'peringatan') AS peringatan`).
+		Where("jadwal_semester_id = ? AND terselesaikan = ?", id, false)
+	if err := kq.Scan(&konflik).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	var perTipe []dto.KonflikPerTipe
+	if err := h.db.Table("konflik").
+		Select("tipe_konflik, COUNT(*) AS jumlah").
+		Where("jadwal_semester_id = ? AND terselesaikan = ?", id, false).
+		Group("tipe_konflik").
+		Order("jumlah DESC").
+		Scan(&perTipe).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	return c.JSON(fiber.Map{
+		"jumlah_slot":            hasil.Jumlah,
+		"jumlah_tanpa_guru":      hasil.TanpaGuru,
+		"jumlah_konflik_terbuka": konflik.Terbuka,
+		"jumlah_kesalahan":       konflik.Kesalahan,
+		"jumlah_peringatan":      konflik.Peringatan,
+		"konflik_per_tipe":       perTipe,
+	})
 }
 
 func (h *PengelolaJadwal) TransisiStatus(c *fiber.Ctx) error {
@@ -429,13 +461,13 @@ func (h *PengelolaJadwal) DaftarKonflik(c *fiber.Ctx) error {
 	if err := q.Order("terdeteksi_pada DESC").Find(&konflik).Error; err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	return c.JSON(konflik)
+	return c.JSON(ringkasKonflik(konflik))
 }
 
 func ringkasKonflik(konflik []models.Konflik) []dto.RingkasanKonflik {
 	ringkasan := make([]dto.RingkasanKonflik, len(konflik))
 	for i, k := range konflik {
-		ringkasan[i] = dto.RingkasanKonflik{
+		item := dto.RingkasanKonflik{
 			ID:            k.ID.String(),
 			Tipe:          k.TipeKonflik,
 			Keparahan:     k.TingkatKeparahan,
@@ -443,6 +475,19 @@ func ringkasKonflik(konflik []models.Konflik) []dto.RingkasanKonflik {
 			Terselesaikan: k.Terselesaikan,
 			Terdeteksi:    k.TerdeteksiPada.Format(time.RFC3339),
 		}
+		if k.SlotAID != nil {
+			s := k.SlotAID.String()
+			item.SlotAID = &s
+		}
+		if k.SlotBID != nil {
+			s := k.SlotBID.String()
+			item.SlotBID = &s
+		}
+		if k.GuruID != nil {
+			s := k.GuruID.String()
+			item.GuruID = &s
+		}
+		ringkasan[i] = item
 	}
 	return ringkasan
 }
@@ -455,7 +500,10 @@ func (h *PengelolaJadwal) Validasi(c *fiber.Ctx) error {
 	}
 	if !js.PerluValidasi {
 		var ada []models.Konflik
-		if err := h.db.Where("jadwal_semester_id = ?", id).Find(&ada).Error; err != nil {
+		if err := h.db.Select(
+			"id", "jadwal_semester_id", "tipe_konflik", "tingkat_keparahan",
+			"slot_a_id", "slot_b_id", "guru_id", "deskripsi", "terselesaikan", "terdeteksi_pada",
+		).Where("jadwal_semester_id = ? AND terselesaikan = ?", id, false).Find(&ada).Error; err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
 		return c.JSON(dto.HasilValidasi{
