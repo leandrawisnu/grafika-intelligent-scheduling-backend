@@ -71,6 +71,7 @@ func (h *PengelolaJadwal) DaftarkanRute(r fiber.Router) {
 	r.Get("/jadwal-semester/:id/konflik", h.DaftarKonflik)
 	r.Post("/jadwal-semester/:id/validasi", h.Validasi)
 	r.Post("/jadwal-semester/:id/prediksi-konflik", h.PrediksiKonflik)
+	r.Post("/jadwal-semester/:id/demo-konflik", h.DemoKonflik)
 
 	// Impor berkas jadwal
 	r.Post("/jadwal-semester/:id/impor/pratinjau", h.PratinjauImpor)
@@ -126,8 +127,13 @@ func (h *PengelolaJadwal) tandaiKelasAktif(c *fiber.Ctx, list []models.JadwalSem
 	q := h.db.Model(&models.JadwalKelas{}).
 		Select("jadwal_semester_id").
 		Where("is_active = ?", true)
-	if terbatas, ok := auth.Terbatas(c); ok {
-		q = q.Where("jurusan_id = ?", terbatas)
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
+		q = q.Joins("JOIN jurusan ON jurusan.id = jadwal_kelas.jurusan_id").
+			Where("jurusan.kode = ?", kode)
 	}
 	if err := q.Group("jadwal_semester_id").Find(&ada).Error; err != nil {
 		return err
@@ -162,9 +168,15 @@ func (h *PengelolaJadwal) RingkasanJadwal(c *fiber.Ctx) error {
 
 	jurusanFilter := ""
 	args := []interface{}{id}
-	if terbatas, ok := auth.Terbatas(c); ok {
-		jurusanFilter = " AND jk.jurusan_id = $2"
-		args = append(args, terbatas)
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
+		// Jurusan per-semester (N copy per kode), jadi filter
+		// lintas semester memakai kode, bukan UUID.
+		jurusanFilter = " AND jk.jurusan_id IN (SELECT id FROM jurusan WHERE kode = $2)"
+		args = append(args, kode)
 	}
 
 	sql := `
@@ -321,8 +333,18 @@ func (h *PengelolaJadwal) AmbilJadwalKelas(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
-	if terbatas, ok := auth.Terbatas(c); ok && jk.JurusanID != terbatas {
-		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
+		milik := jk.Jurusan != nil && jk.Jurusan.Kode == kode
+		if !milik && jk.Kelas != nil && jk.Kelas.Jurusan != nil && jk.Kelas.Jurusan.Kode == kode {
+			milik = true
+		}
+		if !milik {
+			return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+		}
 	}
 	return c.JSON(jk)
 }
@@ -334,10 +356,18 @@ func (h *PengelolaJadwal) SemuaJadwalKelasAktif(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
-	if terbatas, ok := auth.Terbatas(c); ok {
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
 		saring := make([]models.JadwalKelas, 0)
 		for _, item := range list {
-			if item.JurusanID == terbatas {
+			if item.Jurusan != nil && item.Jurusan.Kode == kode {
+				saring = append(saring, item)
+				continue
+			}
+			if item.Kelas != nil && item.Kelas.Jurusan != nil && item.Kelas.Jurusan.Kode == kode {
 				saring = append(saring, item)
 			}
 		}
@@ -470,6 +500,18 @@ func (h *PengelolaJadwal) KetersediaanGuru(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(avail)
+}
+
+func (h *PengelolaJadwal) DemoKonflik(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "id jadwal tidak valid"})
+	}
+	hasil, err := services.NewLayananDemoKonflik(h.db).TambahKonflikAcak(id)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(hasil)
 }
 
 // ========== Konflik ==========

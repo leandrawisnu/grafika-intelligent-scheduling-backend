@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/grafika-scheduling/backend/src/auth"
+	"github.com/grafika-scheduling/backend/src/dto"
 	"github.com/grafika-scheduling/backend/src/models"
 	"github.com/grafika-scheduling/backend/src/services"
 	"gorm.io/gorm"
@@ -20,12 +23,16 @@ func NewPengelolaMaster(db *gorm.DB) *PengelolaMaster {
 
 func (h *PengelolaMaster) Katalog(c *fiber.Ctx) error {
 	terbatas, terbatasOK := auth.Terbatas(c)
+	semID, _ := uuid.Parse(c.Query("semester_id"))
 	kunci := "admin"
+	if semID != uuid.Nil {
+		kunci += ":sem:" + semID.String()
+	}
 	if terbatasOK {
-		kunci = "koor:" + terbatas.String()
+		kunci += ":koor:" + terbatas.String()
 	}
 	body, etag, err := h.cache.ambil(kunci, func() ([]byte, string, error) {
-		return h.bangunKatalog(terbatas, terbatasOK)
+		return h.bangunKatalog(semID, terbatas, terbatasOK)
 	})
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
@@ -81,6 +88,11 @@ func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
 	r.Get("/semester/:id", h.AmbilSemester)
 	r.Put("/semester/:id", h.PerbaruiSemester)
 	r.Delete("/semester/:id", h.HapusSemester)
+	r.Post("/semester/:id/salin", h.SalinSemester)
+	r.Get("/semester/:id/plotting", h.DaftarPlotting)
+	r.Post("/semester/:id/plotting", h.BuatPlotting)
+	r.Put("/plotting/:plottingId", h.PerbaruiPlotting)
+	r.Delete("/plotting/:plottingId", h.HapusPlotting)
 
 	r.Get("/jurusan", h.DaftarJurusan)
 	r.Post("/jurusan", h.BuatJurusan)
@@ -241,17 +253,112 @@ func (h *PengelolaMaster) HapusSemester(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"status": "dihapus"})
 }
 
+func (h *PengelolaMaster) SalinSemester(c *fiber.Ctx) error {
+	sumberID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester id tidak valid"})
+	}
+	var req dto.SalinSemesterRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
+	}
+	target, err := services.NewLayananRollover(h.db).SalinSemester(sumberID, req)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(201).JSON(target)
+}
+
+// Plotting
+func (h *PengelolaMaster) DaftarPlotting(c *fiber.Ctx) error {
+	semID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester id tidak valid"})
+	}
+	items := make([]models.Plotting, 0)
+	q := h.db.Model(&models.Plotting{}).Where("semester_id = ?", semID)
+	return h.halaman(c, q, &items, opsiDaftar{
+		defaultOrder: "kelas_id",
+		filterCols:   []string{"kelas_id", "hari_id", "guru_id", "mata_pelajaran_id"},
+		preloads:     []string{"Kelas", "Hari", "JamPelajaran", "MataPelajaran", "Guru", "Ruangan"},
+	})
+}
+
+func (h *PengelolaMaster) BuatPlotting(c *fiber.Ctx) error {
+	semID, err := uuid.Parse(c.Params("id"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester id tidak valid"})
+	}
+	var req dto.BuatPlottingRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
+	}
+	item, err := services.NewLayananPlotting(h.db).BuatPlotting(semID, req)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.Status(201).JSON(item)
+}
+
+func (h *PengelolaMaster) PerbaruiPlotting(c *fiber.Ctx) error {
+	id, err := uuid.Parse(c.Params("plottingId"))
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "plotting id tidak valid"})
+	}
+	var req dto.BuatPlottingRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
+	}
+	var lama models.Plotting
+	if h.db.Select("semester_id").First(&lama, "id = ?", id).Error != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	}
+	baru, err := services.NewLayananPlotting(h.db).BuatPlotting(lama.SemesterID, req)
+	if err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Delete(&models.Plotting{}, "id = ?", id)
+	baru.ID = id
+	h.db.Model(&models.Plotting{}).Where("id = ?", id).Updates(map[string]any{
+		"kelas_id":          baru.KelasID,
+		"hari_id":           baru.HariID,
+		"jam_pelajaran_id":  baru.JamPelajaranID,
+		"mata_pelajaran_id": baru.MataPelajaranID,
+		"guru_id":           baru.GuruID,
+		"ruangan_id":        baru.RuanganID,
+	})
+	h.db.Preload("Kelas").Preload("Hari").Preload("JamPelajaran").
+		Preload("MataPelajaran").Preload("Guru").Preload("Ruangan").
+		First(baru, "id = ?", id)
+	return c.JSON(baru)
+}
+
+func (h *PengelolaMaster) HapusPlotting(c *fiber.Ctx) error {
+	id, _ := uuid.Parse(c.Params("plottingId"))
+	h.db.Delete(&models.Plotting{}, "id = ?", id)
+	return c.JSON(fiber.Map{"status": "dihapus"})
+}
+
 // Jurusan
 func (h *PengelolaMaster) DaftarJurusan(c *fiber.Ctx) error {
 	items := make([]models.Jurusan, 0)
 	q := h.db.Model(&models.Jurusan{})
-	if id, ok := auth.Terbatas(c); ok {
-		q = q.Where("id = ?", id)
+	if semID := c.Query("semester_id"); semID != "" {
+		q = q.Where("jurusan.semester_id = ?", semID)
+	}
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
+		q = q.Where("jurusan.kode = ?", kode)
 	}
 	return h.halaman(c, q, &items, opsiDaftar{
 		defaultOrder: "kode",
 		searchCols:   []string{"kode", "nama"},
+		filterCols:   []string{"semester_id"},
 		sortCols:     map[string]string{"kode": "kode", "nama": "nama"},
+		preloads:     []string{"Semester"},
 	})
 }
 
@@ -260,18 +367,28 @@ func (h *PengelolaMaster) BuatJurusan(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	h.db.Create(&item)
+	if item.SemesterID == uuid.Nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester_id wajib diisi"})
+	}
+	item.Semester = nil
+	if err := h.db.Create(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Preload("Semester").First(&item, "id = ?", item.ID)
 	return c.Status(201).JSON(item)
 }
 
 func (h *PengelolaMaster) AmbilJurusan(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 	var item models.Jurusan
-	if h.db.First(&item, "id = ?", id).Error != nil {
+	if h.db.Preload("Semester").First(&item, "id = ?", id).Error != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
-	if terbatas, ok := auth.Terbatas(c); ok && item.ID != terbatas {
-		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada || item.Kode != kode {
+			return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+		}
 	}
 	return c.JSON(item)
 }
@@ -282,8 +399,9 @@ func (h *PengelolaMaster) PerbaruiJurusan(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
+	item.Semester = nil
 	h.db.Model(&models.Jurusan{}).Where("id = ?", id).Updates(&item)
-	h.db.First(&item, "id = ?", id)
+	h.db.Preload("Semester").First(&item, "id = ?", id)
 	return c.JSON(item)
 }
 
@@ -367,6 +485,9 @@ func (h *PengelolaMaster) BuatHariLiburGuru(c *fiber.Ctx) error {
 	}
 	item.GuruID = id
 	if err := h.db.Create(&item).Error; err != nil {
+		if strings.Contains(err.Error(), "duplicate key") {
+			return c.Status(409).JSON(fiber.Map{"error": "guru ini sudah libur pada hari dan semester yang sama"})
+		}
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	if err := services.TandaiSemuaPerluValidasi(h.db); err != nil {
@@ -440,15 +561,20 @@ func (h *PengelolaMaster) DaftarKelas(c *fiber.Ctx) error {
 	items := make([]models.Kelas, 0)
 	q := h.db.Model(&models.Kelas{})
 	if semID := c.Query("semester_id"); semID != "" {
-		q = q.Where("semester_id = ?", semID)
+		q = q.Where("kelas.semester_id = ?", semID)
 	}
-	if id, ok := auth.Terbatas(c); ok {
-		q = q.Where("jurusan_id = ?", id)
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada {
+			return c.Status(403).JSON(fiber.Map{"error": "akses ditolak"})
+		}
+		q = q.Joins("JOIN jurusan ON jurusan.id = kelas.jurusan_id").
+			Where("jurusan.kode = ?", kode)
 	}
 	return h.halaman(c, q, &items, opsiDaftar{
 		defaultOrder: "kode",
 		searchCols:   []string{"kode", "nama"},
-		filterCols:   []string{"jurusan_id"},
+		filterCols:   []string{"jurusan_id", "semester_id"},
 		sortCols: map[string]string{
 			"kode":    "kode",
 			"nama":    "nama",
@@ -462,6 +588,9 @@ func (h *PengelolaMaster) BuatKelas(c *fiber.Ctx) error {
 	var item models.Kelas
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
+	}
+	if item.SemesterID == uuid.Nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester_id wajib diisi"})
 	}
 	item.Jurusan = nil
 	item.Semester = nil
@@ -478,8 +607,11 @@ func (h *PengelolaMaster) AmbilKelas(c *fiber.Ctx) error {
 	if h.db.Preload("Jurusan").Preload("Semester").First(&item, "id = ?", id).Error != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
-	if terbatas, ok := auth.Terbatas(c); ok && item.JurusanID != terbatas {
-		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+	if _, ok := auth.Terbatas(c); ok {
+		kode, ada := auth.KodeJurusanPengguna(h.db, c)
+		if !ada || item.Jurusan == nil || item.Jurusan.Kode != kode {
+			return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
+		}
 	}
 	return c.JSON(item)
 }
@@ -514,15 +646,21 @@ func (h *PengelolaMaster) HapusKelas(c *fiber.Ctx) error {
 // Ruangan
 func (h *PengelolaMaster) DaftarRuangan(c *fiber.Ctx) error {
 	items := make([]models.Ruangan, 0)
-	return h.halaman(c, h.db.Model(&models.Ruangan{}), &items, opsiDaftar{
+	q := h.db.Model(&models.Ruangan{})
+	if semID := c.Query("semester_id"); semID != "" {
+		q = q.Where("semester_id = ?", semID)
+	}
+	return h.halaman(c, q, &items, opsiDaftar{
 		defaultOrder: "kode",
 		searchCols:   []string{"kode", "nama", "tipe_ruangan"},
+		filterCols:   []string{"semester_id"},
 		sortCols: map[string]string{
 			"kode":         "kode",
 			"nama":         "nama",
 			"kapasitas":    "kapasitas",
 			"tipe_ruangan": "tipe_ruangan",
 		},
+		preloads: []string{"Semester"},
 	})
 }
 
@@ -531,14 +669,21 @@ func (h *PengelolaMaster) BuatRuangan(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
-	h.db.Create(&item)
+	if item.SemesterID == uuid.Nil {
+		return c.Status(400).JSON(fiber.Map{"error": "semester_id wajib diisi"})
+	}
+	item.Semester = nil
+	if err := h.db.Create(&item).Error; err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	h.db.Preload("Semester").First(&item, "id = ?", item.ID)
 	return c.Status(201).JSON(item)
 }
 
 func (h *PengelolaMaster) AmbilRuangan(c *fiber.Ctx) error {
 	id, _ := uuid.Parse(c.Params("id"))
 	var item models.Ruangan
-	if h.db.First(&item, "id = ?", id).Error != nil {
+	if h.db.Preload("Semester").First(&item, "id = ?", id).Error != nil {
 		return c.Status(404).JSON(fiber.Map{"error": "tidak ditemukan"})
 	}
 	return c.JSON(item)
@@ -550,8 +695,9 @@ func (h *PengelolaMaster) PerbaruiRuangan(c *fiber.Ctx) error {
 	if err := c.BodyParser(&item); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "format body salah"})
 	}
+	item.Semester = nil
 	h.db.Model(&models.Ruangan{}).Where("id = ?", id).Updates(&item)
-	h.db.First(&item, "id = ?", id)
+	h.db.Preload("Semester").First(&item, "id = ?", id)
 	return c.JSON(item)
 }
 

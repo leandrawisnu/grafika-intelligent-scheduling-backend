@@ -16,7 +16,7 @@ import (
 )
 
 // Versi migrasi terakhir; setelah -migrate init dipakai untuk force agar up berikutnya no-op.
-const LatestMigrationVersion = 20260929161400
+const LatestMigrationVersion = 20261003125955
 
 // RunMigrateCommand menjalankan subcommand golang-migrate (up, down, version, force).
 func RunMigrateCommand(databaseURL, migrationsDir, command string, args []string) error {

@@ -36,7 +36,7 @@ func TestCocokkanGuruBentrokUtamakanPengajarMapelYangSama(t *testing.T) {
 	if len(usulan) == 0 {
 		t.Fatal("usulan kosong")
 	}
-	if usulan[0].Label != "Pindah ke Sari" {
+	if usulan[0].Label != "Kelas Uji pindah ke Sari" {
 		t.Fatalf("usulan pertama %q, ingin guru yang sudah mengajar mapel yang sama", usulan[0].Label)
 	}
 	if usulan[0].Perubahan[0].NewTeacherID != guruSama.String() {
@@ -71,7 +71,7 @@ func TestCocokkanMelewatiGuruSibukLiburAtauPenuh(t *testing.T) {
 	}
 	idB := slotB
 	usulan := cocokkan(k, models.Konflik{TipeKonflik: "guru_hari_libur", SlotAID: &idB})
-	if len(usulan) != 1 || usulan[0].Label != "Pindah ke Bebas" {
+	if len(usulan) != 1 || usulan[0].Label != "Kelas Uji pindah ke Bebas" {
 		t.Fatalf("usulan = %+v", usulan)
 	}
 }
@@ -104,7 +104,7 @@ func TestCocokkanRuanganDanJam(t *testing.T) {
 	}
 	idB := slotB
 	usulRuang := cocokkan(kRuang, models.Konflik{TipeKonflik: "ruangan_bentrok", SlotBID: &idB})
-	if len(usulRuang) != 1 || usulRuang[0].Label != "Pindah ke Lab 2" {
+	if len(usulRuang) != 1 || usulRuang[0].Label != "Kelas Uji pindah ke Lab 2" {
 		t.Fatalf("ruangan = %+v", usulRuang)
 	}
 
@@ -119,7 +119,7 @@ func TestCocokkanRuanganDanJam(t *testing.T) {
 	if len(usulJam) != 1 || usulJam[0].Perubahan[0].NewTimeSlotID != jam2.String() {
 		t.Fatalf("jam = %+v", usulJam)
 	}
-	if usulJam[0].Label != "Pindah ke Senin jam ke-2" {
+	if usulJam[0].Label != "Kelas Uji pindah ke Senin jam ke-2" {
 		t.Fatalf("label jam %q", usulJam[0].Label)
 	}
 }
@@ -183,7 +183,7 @@ func TestUsulanTidakMenyarankanGuruPenuhYangSlotnyaTersaring(t *testing.T) {
 		t.Fatal("slot guru Penuh seharusnya tersaring agar tes ini bermakna")
 	}
 	usulan := cocokkan(k, konflik)
-	if len(usulan) != 1 || usulan[0].Label != "Pindah ke Bebas" {
+	if len(usulan) != 1 || usulan[0].Label != "Kelas Uji pindah ke Bebas" {
 		t.Fatalf("usulan = %+v, guru yang sudah mencapai jam maksimal tidak boleh disarankan", usulan)
 	}
 }
@@ -301,6 +301,7 @@ func slotUji(id, guru, mapel, hari, jam, ruang uuid.UUID, namaMapel, namaHari st
 		JamPelajaranID:  jam,
 		RuanganID:       ruang,
 		KelasID:         uuid.New(),
+		Kelas:           &models.Kelas{Nama: "Kelas Uji"},
 		MataPelajaran:   &models.MataPelajaran{Nama: namaMapel},
 		Hari:            &models.Hari{Nama: namaHari},
 		JamPelajaran:    &models.JamPelajaran{JamKe: jamKe},

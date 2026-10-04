@@ -28,7 +28,7 @@ Buat user/database di Postgres lokal sesuai `.env`, lalu:
 
 ```bash
 make migrate-init
-make seed-demo   # opsional: data demo Ganjil 2026/2027 (master + jadwal + slot)
+make seed-demo   # opsional: data demo Demo - Ganjil 2026/2027 (master + jadwal + slot)
 make start
 curl -s http://127.0.0.1:8080/health
 ```
@@ -47,7 +47,7 @@ make db-up
 | `make start` | `go run ./src` (tanpa reload) |
 | `make air-install` | `go install` Air ke `$(go env GOPATH)/bin` |
 | `make migrate-init` / `migrate-up` / … | Migrasi |
-| `make seed-demo` | Data demo Ganjil 2026/2027 (master + jadwal + slot); `--skeleton-only` via `./scripts/seed-demo.sh --skeleton-only` |
+| `make seed-demo` | Data demo Demo - Ganjil 2026/2027 (master + jadwal + slot); `--skeleton-only` via `./scripts/seed-demo.sh --skeleton-only` |
 | `make db-up` / `db-down` | Postgres Docker saja (opsional) |
 
 ## Docker API (`web-api`)

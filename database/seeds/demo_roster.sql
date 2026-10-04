@@ -1,4 +1,4 @@
--- Roster demo Ganjil 2026/2027 — guru + home room tambahan.
+-- Roster demo Demo - Ganjil 2026/2027 — guru + home room tambahan.
 -- Idempotent: aman dijalankan ulang.
 --
 -- Kenapa file ini ada:
@@ -44,13 +44,13 @@ INSERT INTO guru (nip, nama_lengkap, jam_maksimal_per_minggu, aktif) VALUES
   ('DEMO-028', 'Rudi', 40, true)
 ON CONFLICT (nip) DO NOTHING;
 
--- Home room: 1 ruangan unik per kelas demo.
-INSERT INTO ruangan (kode, nama, kapasitas, tipe_ruangan, aktif)
-SELECT 'R-' || k.kode, 'Ruang ' || k.nama, 36, 'kelas', true
+-- Home room: 1 ruangan unik per kelas demo (per-semester).
+INSERT INTO ruangan (kode, nama, kapasitas, tipe_ruangan, aktif, semester_id)
+SELECT 'R-' || k.kode, 'Ruang ' || k.nama, 36, 'kelas', true, k.semester_id
 FROM kelas k
 JOIN semester sem ON sem.id = k.semester_id
 JOIN tahun_ajaran ta ON ta.id = sem.tahun_ajaran_id
-WHERE ta.nama = '2026/2027' AND sem.semester_ke = 1
-ON CONFLICT (kode) DO NOTHING;
+WHERE ta.nama = 'Demo - 2026/2027' AND sem.semester_ke = 1
+ON CONFLICT (semester_id, kode) DO NOTHING;
 
 COMMIT;

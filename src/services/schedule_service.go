@@ -48,8 +48,19 @@ func (s *LayananJadwal) AmbilJadwalSemester(id uuid.UUID) (*models.JadwalSemeste
 }
 
 func (s *LayananJadwal) TambahJurusanKeSemester(id uuid.UUID, jurusanIDs []string) error {
+	var js models.JadwalSemester
+	if err := s.db.Select("id", "semester_id").First(&js, "id = ?", id).Error; err != nil {
+		return fmt.Errorf("jadwal semester tidak ditemukan")
+	}
 	for _, jid := range jurusanIDs {
 		jurID, _ := uuid.Parse(jid)
+		var jur models.Jurusan
+		if err := s.db.Select("id", "semester_id").First(&jur, "id = ?", jurID).Error; err != nil {
+			return fmt.Errorf("jurusan tidak ditemukan")
+		}
+		if jur.SemesterID != js.SemesterID {
+			return fmt.Errorf("jurusan bukan milik semester jadwal ini")
+		}
 		s.db.FirstOrCreate(&models.JadwalSemesterJurusan{}, map[string]interface{}{
 			"jadwal_semester_id": id,
 			"jurusan_id":         jurID,
@@ -322,10 +333,18 @@ func (s *LayananJadwal) AmbilKetersediaanGuru(jsID uuid.UUID) ([]map[string]inte
 		}
 
 		var hariLibur []string
-		s.db.Model(&models.HariLiburGuru{}).Select("h.nama").
-			Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
-			Where("hari_libur_guru.guru_id = ?", g.ID).
-			Pluck("h.nama", &hariLibur)
+		var js models.JadwalSemester
+		if err := s.db.Select("semester_id").First(&js, "id = ?", jsID).Error; err == nil {
+			s.db.Model(&models.HariLiburGuru{}).Select("h.nama").
+				Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
+				Where("hari_libur_guru.guru_id = ? AND hari_libur_guru.semester_id = ?", g.ID, js.SemesterID).
+				Pluck("h.nama", &hariLibur)
+		} else {
+			s.db.Model(&models.HariLiburGuru{}).Select("h.nama").
+				Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
+				Where("hari_libur_guru.guru_id = ?", g.ID).
+				Pluck("h.nama", &hariLibur)
+		}
 
 		hasil = append(hasil, map[string]interface{}{
 			"id":                      g.ID,

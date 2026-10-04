@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Seed data demo — Ganjil 2026/2027 (SMKN 4 Malang).
+# Seed data demo — Demo - Ganjil 2026/2027 (SMKN 4 Malang).
 # Satu-satunya entrypoint seeding. Idempotent: aman dijalankan ulang.
 #
 # Urutan:
@@ -7,7 +7,8 @@
 #   2. ganjil_2026_2027.sql             — skeleton (tahun ajaran, jurusan,
 #                                          jam, ruangan, kelas, jadwal semester)
 #   3. mapel_guru_ganjil_2026.sql       — master mapel + guru
-#   4. demo_slots.sql                   — template slot mingguan per kelas
+#   4. demo_roster.sql                  — guru + home room tambahan
+#   5. demo_slots.sql                   — template slot mingguan per kelas
 #
 # Usage (dari root backend, butuh .env + psql):
 #   ./scripts/seed-demo.sh            # full: skeleton + master + slot
@@ -59,6 +60,7 @@ run_sql() {
 run_sql "fix_duplicate_ganjil_semester.sql"
 run_sql "ganjil_2026_2027.sql"
 run_sql "mapel_guru_ganjil_2026.sql"
+run_sql "demo_roster.sql"
 
 if [[ "$SKELETON_ONLY" == "true" ]]; then
   echo "[seed-demo] selesai (skeleton saja, tanpa slot)"

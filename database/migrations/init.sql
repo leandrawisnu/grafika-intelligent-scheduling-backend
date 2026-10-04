@@ -29,10 +29,12 @@ CREATE TABLE semester (
 
 CREATE TABLE jurusan (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(20) NOT NULL CONSTRAINT uni_jurusan_kode UNIQUE,
+    kode            VARCHAR(20) NOT NULL,
     nama            VARCHAR(100) NOT NULL,
+    semester_id     UUID NOT NULL REFERENCES semester(id),
     created_at     TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uni_jurusan_sem_kode UNIQUE(semester_id, kode)
 );
 
 CREATE TABLE guru (
@@ -57,24 +59,27 @@ CREATE TABLE mata_pelajaran (
 
 CREATE TABLE kelas (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(30) NOT NULL CONSTRAINT uni_kelas_kode UNIQUE,
+    kode            VARCHAR(30) NOT NULL,
     nama            VARCHAR(100) NOT NULL,
     tingkat         SMALLINT NOT NULL,
     jurusan_id      UUID REFERENCES jurusan(id),
     semester_id     UUID NOT NULL REFERENCES semester(id),
     created_at     TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uni_kelas_sem_kode UNIQUE(semester_id, kode)
 );
 
 CREATE TABLE ruangan (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kode            VARCHAR(20) NOT NULL CONSTRAINT uni_ruangan_kode UNIQUE,
+    kode            VARCHAR(20) NOT NULL,
     nama            VARCHAR(100) NOT NULL,
     kapasitas       INT NOT NULL DEFAULT 30,
     tipe_ruangan    VARCHAR(30) DEFAULT 'kelas',
     aktif           BOOLEAN DEFAULT true,
+    semester_id     UUID NOT NULL REFERENCES semester(id),
     created_at     TIMESTAMPTZ DEFAULT now(),
-    updated_at TIMESTAMPTZ DEFAULT now()
+    updated_at TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uni_ruangan_sem_kode UNIQUE(semester_id, kode)
 );
 
 CREATE TABLE hari (
@@ -106,6 +111,37 @@ CREATE TABLE jam_pelajaran (
 );
 
 -- ============================================
+-- PENGGUNA & SESI (AUTH)
+-- ============================================
+
+CREATE TABLE pengguna (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email           VARCHAR(255) NOT NULL CONSTRAINT uni_pengguna_email UNIQUE,
+    password_hash   TEXT NOT NULL,
+    peran           VARCHAR(30) NOT NULL,
+    jurusan_id      UUID REFERENCES jurusan(id),
+    aktif           BOOLEAN NOT NULL DEFAULT true,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT pengguna_peran_chk CHECK (peran IN ('admin', 'koor_jurusan')),
+    CONSTRAINT pengguna_jurusan_chk CHECK (
+        (peran = 'admin' AND jurusan_id IS NULL)
+        OR (peran = 'koor_jurusan' AND jurusan_id IS NOT NULL)
+    )
+);
+
+CREATE TABLE sesi (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pengguna_id     UUID NOT NULL REFERENCES pengguna(id) ON DELETE CASCADE,
+    token_hash      CHAR(64) NOT NULL CONSTRAINT uni_sesi_token_hash UNIQUE,
+    kedaluwarsa     TIMESTAMPTZ NOT NULL,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_sesi_pengguna ON sesi(pengguna_id);
+
+-- ============================================
 -- KENDALA GURU
 -- ============================================
 
@@ -120,6 +156,27 @@ CREATE TABLE hari_libur_guru (
     UNIQUE(guru_id, hari_id, semester_id)
 );
 
+-- Plotting: rencana penugasan per jam per semester.
+-- Satu baris = satu jam pelajaran (semester, kelas, hari, jam) -> (mapel, guru, ruangan).
+-- Tanpa kolom timespan/durasi: mapel 2 jam = 2 baris identik kecuali jam_pelajaran_id.
+CREATE TABLE plotting (
+    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    semester_id       UUID NOT NULL REFERENCES semester(id) ON DELETE CASCADE,
+    kelas_id          UUID NOT NULL REFERENCES kelas(id) ON DELETE CASCADE,
+    hari_id           UUID NOT NULL REFERENCES hari(id),
+    jam_pelajaran_id  UUID NOT NULL REFERENCES jam_pelajaran(id),
+    mata_pelajaran_id UUID NOT NULL REFERENCES mata_pelajaran(id),
+    guru_id           UUID NOT NULL REFERENCES guru(id),
+    ruangan_id        UUID REFERENCES ruangan(id),
+    created_at       TIMESTAMPTZ DEFAULT now(),
+    updated_at       TIMESTAMPTZ DEFAULT now(),
+    CONSTRAINT uni_plotting_sel UNIQUE(semester_id, kelas_id, hari_id, jam_pelajaran_id)
+);
+
+CREATE INDEX idx_plotting_guru_sem ON plotting(guru_id, semester_id);
+CREATE INDEX idx_plotting_kelas ON plotting(kelas_id);
+CREATE INDEX idx_plotting_sem_hari_jam ON plotting(semester_id, hari_id, jam_pelajaran_id);
+
 -- ============================================
 -- JADWAL — STRUKTUR BARU
 -- ============================================
@@ -130,6 +187,7 @@ CREATE TABLE jadwal_semester (
     semester_id     UUID NOT NULL REFERENCES semester(id),
     status          VARCHAR(20) NOT NULL DEFAULT 'draf',
     bebas_konflik   BOOLEAN DEFAULT false,
+    perlu_validasi  BOOLEAN NOT NULL DEFAULT true,
     created_at     TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(semester_id)
@@ -176,6 +234,14 @@ CREATE TABLE slot_jadwal (
     UNIQUE(jadwal_kelas_id, ruangan_id, hari_id, jam_pelajaran_id, minggu_ke),
     UNIQUE(jadwal_kelas_id, guru_id, hari_id, jam_pelajaran_id, minggu_ke)
 );
+
+CREATE INDEX idx_slot_guru_hari_jam
+  ON slot_jadwal (guru_id, hari_id, jam_pelajaran_id)
+  WHERE guru_id IS NOT NULL;
+
+CREATE INDEX idx_slot_ruang_hari_jam
+  ON slot_jadwal (ruangan_id, hari_id, jam_pelajaran_id)
+  WHERE ruangan_id IS NOT NULL;
 
 -- ============================================
 -- KONFLIK

@@ -39,11 +39,6 @@ func main() {
 	}
 
 	db := database.Connect(dsn)
-	if cfg.AutoMigrate {
-		if err := database.AutoMigrate(db); err != nil {
-			log.Fatalf("Gagal auto-migrate: %v", err)
-		}
-	}
 	if err := auth.NewLayanan(db).PastikanAdmin(cfg.AdminEmail, cfg.AdminPassword); err != nil {
 		log.Fatalf("akun admin: %v", err)
 	}

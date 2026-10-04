@@ -177,7 +177,7 @@ func (k konteksCocok) usulGuru(slots ...*models.SlotJadwal) []UsulanCocok {
 			}
 			usulan = append(usulan, UsulanCocok{
 				Peringkat:  len(usulan) + 1,
-				Label:      "Pindah ke " + g.NamaLengkap,
+				Label:      fmt.Sprintf("%s pindah ke %s", namaKelas(*slot), g.NamaLengkap),
 				Penjelasan: alasan,
 				Keyakinan:  keyakinan,
 				Perubahan: []PerubahanSlot{{
@@ -203,7 +203,7 @@ func (k konteksCocok) usulRuangan(slots ...*models.SlotJadwal) []UsulanCocok {
 		for _, r := range k.kandidatRuang(*slot) {
 			usulan = append(usulan, UsulanCocok{
 				Peringkat:  len(usulan) + 1,
-				Label:      "Pindah ke " + r.Nama,
+				Label:      fmt.Sprintf("%s pindah ke %s", namaKelas(*slot), r.Nama),
 				Penjelasan: fmt.Sprintf("Ruangan %s bertipe sama dan kosong pada %s jam ke-%d.", r.Nama, namaHari(*slot), nomorJam(*slot)),
 				Keyakinan:  1,
 				Perubahan: []PerubahanSlot{{
@@ -229,7 +229,7 @@ func (k konteksCocok) usulJam(slots ...*models.SlotJadwal) []UsulanCocok {
 		for _, j := range k.kandidatJam(*slot) {
 			usulan = append(usulan, UsulanCocok{
 				Peringkat:  len(usulan) + 1,
-				Label:      fmt.Sprintf("Pindah ke %s jam ke-%d", namaHari(*slot), j.JamKe),
+				Label:      fmt.Sprintf("%s pindah ke %s jam ke-%d", namaKelas(*slot), namaHari(*slot), j.JamKe),
 				Penjelasan: fmt.Sprintf("Kelas, guru, dan ruangan slot ini kosong pada jam ke-%d.", j.JamKe),
 				Keyakinan:  1,
 				Perubahan: []PerubahanSlot{{
@@ -411,6 +411,13 @@ func (k konteksCocok) slotGuru(id *uuid.UUID) []*models.SlotJadwal {
 		}
 	}
 	return out
+}
+
+func namaKelas(slot models.SlotJadwal) string {
+	if slot.Kelas != nil && slot.Kelas.Nama != "" {
+		return slot.Kelas.Nama
+	}
+	return "kelas ini"
 }
 
 func namaHari(slot models.SlotJadwal) string {
