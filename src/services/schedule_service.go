@@ -139,9 +139,13 @@ func (s *LayananJadwal) AmbilJadwalKelas(id uuid.UUID) (*models.JadwalKelas, err
 }
 
 func (s *LayananJadwal) AmbilSemuaJadwalKelasAktif(jsID uuid.UUID, ringkas bool) ([]models.JadwalKelas, error) {
-	q := s.db.Where("jadwal_semester_id = ? AND is_active = ?", jsID, true).Preload("Kelas")
-	if !ringkas {
-		q = q.Preload("SlotJadwal")
+	q := s.db.Model(&models.JadwalKelas{}).
+		Where("jadwal_kelas.jadwal_semester_id = ? AND jadwal_kelas.is_active = ?", jsID, true)
+	if ringkas {
+		// Satu query JOIN kelas — hindari query Preload terpisah saat bootstrap.
+		q = q.Joins("Kelas")
+	} else {
+		q = q.Preload("Kelas").Preload("SlotJadwal")
 	}
 	var list []models.JadwalKelas
 	if err := q.Find(&list).Error; err != nil {
