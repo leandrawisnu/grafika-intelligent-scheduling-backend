@@ -13,12 +13,17 @@ import (
 )
 
 type PengelolaMaster struct {
-	db    *gorm.DB
-	cache *cacheKatalog
+	db          *gorm.DB
+	cache       *cacheKatalog
+	rateLimiter fiber.Handler
 }
 
-func NewPengelolaMaster(db *gorm.DB) *PengelolaMaster {
-	return &PengelolaMaster{db: db, cache: baruCacheKatalog(tahanKatalog)}
+func NewPengelolaMaster(db *gorm.DB, rateLimiter fiber.Handler) *PengelolaMaster {
+	if rateLimiter == nil {
+		// Pass-through when the limiter is disabled.
+		rateLimiter = func(c *fiber.Ctx) error { return c.Next() }
+	}
+	return &PengelolaMaster{db: db, cache: baruCacheKatalog(tahanKatalog), rateLimiter: rateLimiter}
 }
 
 func (h *PengelolaMaster) Katalog(c *fiber.Ctx) error {
@@ -88,7 +93,7 @@ func (h *PengelolaMaster) DaftarkanRute(r fiber.Router) {
 	r.Get("/semester/:id", h.AmbilSemester)
 	r.Put("/semester/:id", h.PerbaruiSemester)
 	r.Delete("/semester/:id", h.HapusSemester)
-	r.Post("/semester/:id/salin", h.SalinSemester)
+	r.Post("/semester/:id/salin", h.rateLimiter, h.SalinSemester)
 	r.Get("/semester/:id/plotting", h.DaftarPlotting)
 	r.Post("/semester/:id/plotting", h.BuatPlotting)
 	r.Put("/plotting/:plottingId", h.PerbaruiPlotting)

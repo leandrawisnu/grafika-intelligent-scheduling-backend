@@ -6,6 +6,9 @@
 #   ./scripts/run.sh grid-read
 #   ./scripts/run.sh session-overhead
 #   ./scripts/run.sh validation-spike
+#   ./scripts/run.sh resolver-flow
+#   ./scripts/run.sh plotting-crud
+#   ./scripts/run.sh rollover
 #   ./scripts/run.sh smoke -- --out json=results/smoke.json
 #
 # E2E via Next.js proxy (cookie auth, same as browser):
@@ -41,17 +44,17 @@ SCRIPT="$ROOT/k6/smoke.js"
 case "$SCENARIO" in
   smoke) SCRIPT="$ROOT/k6/smoke.js" ;;
   fe-smoke) SCRIPT="$ROOT/k6/smoke-fe.js" ;;
-  bootstrap|grid-read|session-overhead|validation-spike)
+  bootstrap|grid-read|session-overhead|validation-spike|resolver-flow|plotting-crud|rollover)
     SCRIPT="$ROOT/k6/scenarios/${SCENARIO}.js"
     ;;
-  fe-bootstrap|fe-grid-read|fe-session-overhead|fe-validation-spike)
+  fe-bootstrap|fe-grid-read|fe-session-overhead|fe-validation-spike|fe-resolver-flow|fe-plotting-crud)
     SCRIPT="$ROOT/k6/scenarios/${SCENARIO}.js"
     ;;
   *)
     echo "Unknown scenario: $SCENARIO" >&2
     echo "Available:" >&2
-    echo "  API direct: smoke, bootstrap, grid-read, session-overhead, validation-spike" >&2
-    echo "  FE proxy:   fe-smoke, fe-bootstrap, fe-grid-read, fe-session-overhead, fe-validation-spike" >&2
+    echo "  API direct: smoke, bootstrap, grid-read, session-overhead, validation-spike, resolver-flow, plotting-crud, rollover" >&2
+    echo "  FE proxy:   fe-smoke, fe-bootstrap, fe-grid-read, fe-session-overhead, fe-validation-spike, fe-resolver-flow, fe-plotting-crud" >&2
     exit 1
     ;;
 esac

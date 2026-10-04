@@ -2,6 +2,7 @@ package router
 
 import (
 	"strings"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/compress"
@@ -47,17 +48,24 @@ func New(db *gorm.DB, mlClient *mlclient.Client, objek *storage.Client, cfg *con
 	mw := auth.NewMiddleware(layananAuth, auth.NewLingkup(db))
 	pengelolaAuth := handlers.NewPengelolaAuth(layananAuth)
 
+	// In-memory per-user limiter for heavy endpoints
+	// (GIS_RATE_LIMIT <= 0 disables it).
+	rateLimiter := auth.NewRateLimiter(cfg.RateLimit, time.Duration(cfg.RateLimitWindowSec)*time.Second)
+
 	v1 := app.Group("/api/v1")
 	v1.Post("/auth/masuk", pengelolaAuth.Masuk)
 	v1.Use(mw.WajibSesi)
 	v1.Post("/auth/keluar", pengelolaAuth.Keluar)
 	v1.Get("/auth/sesi", pengelolaAuth.Sesi)
 
-	pengelolaMaster := handlers.NewPengelolaMaster(db)
+	pengelolaMaster := handlers.NewPengelolaMaster(db, rateLimiter.Handler())
 	pengelolaMaster.DaftarkanRute(v1)
 
-	pengelolaJadwal := handlers.NewPengelolaJadwal(db, mlClient, objek)
+	pengelolaJadwal := handlers.NewPengelolaJadwal(db, mlClient, objek, rateLimiter.Handler())
 	pengelolaJadwal.DaftarkanRute(v1)
+
+	pengelolaImporAI := handlers.NewPengelolaImporAI(db, mlClient, objek, rateLimiter.Handler())
+	pengelolaImporAI.DaftarkanRute(v1)
 
 	return app
 }

@@ -19,7 +19,7 @@ export function setup() {
   const targets = discoverTargetsFe(cfg, session);
 
   if (!targets.jadwalKelasId) {
-    throw new Error("No jadwal kelas found — run make seed-slots first");
+    throw new Error("No jadwal kelas found — run make seed-demo first");
   }
 
   return { cfg, ...targets };

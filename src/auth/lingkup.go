@@ -58,6 +58,8 @@ func (l *Lingkup) Periksa(c *fiber.Ctx, akun models.Pengguna) error {
 			return ErrAksesDitolak
 		}
 		return nil
+	case GerbangCekDokumenImpor:
+		return l.dokumenImpor(c, jurusanID)
 	default:
 		return ErrAksesDitolak
 	}
@@ -228,6 +230,52 @@ func (l *Lingkup) slot(slotID string, jurusanID uuid.UUID) error {
 		return ErrAksesDitolak
 	}
 	return l.jadwalKelas(slot.JadwalKelasID.String(), jurusanID)
+}
+
+// dokumenImpor membatasi job impor AI koor_jurusan ke semester milik jurusannya.
+// Saat create, jadwal_semester_id dibaca dari multipart; saat operasi lain,
+// kepemilikan diperiksa dari baris job.
+func (l *Lingkup) dokumenImpor(c *fiber.Ctx, jurusanID uuid.UUID) error {
+	kode, ok := l.kodeJurusan(jurusanID)
+	if !ok {
+		return ErrAksesDitolak
+	}
+	id := c.Params("id")
+	if id == "" {
+		form, err := c.MultipartForm()
+		if err != nil {
+			return ErrAksesDitolak
+		}
+		nilai := ""
+		if daftar := form.Value["jadwal_semester_id"]; len(daftar) > 0 {
+			nilai = strings.TrimSpace(daftar[0])
+		}
+		if nilai == "" {
+			return ErrAksesDitolak
+		}
+		return l.semesterMilikJurusan(nilai, kode)
+	}
+
+	var job models.DokumenImpor
+	if err := l.db.Select("jadwal_semester_id").First(&job, "id = ?", id).Error; err != nil {
+		return ErrAksesDitolak
+	}
+	if job.JadwalSemesterID == nil {
+		return ErrAksesDitolak
+	}
+	return l.semesterMilikJurusan(job.JadwalSemesterID.String(), kode)
+}
+
+func (l *Lingkup) semesterMilikJurusan(jadwalSemesterID, kode string) error {
+	var jumlah int64
+	err := l.db.Table("jadwal_semester_jurusan AS jsj").
+		Joins("JOIN jurusan j ON j.id = jsj.jurusan_id").
+		Where("jsj.jadwal_semester_id = ? AND j.kode = ?", jadwalSemesterID, kode).
+		Count(&jumlah).Error
+	if err != nil || jumlah == 0 {
+		return ErrAksesDitolak
+	}
+	return nil
 }
 
 func jurusanDiBody(body []byte, jurusanID uuid.UUID) error {

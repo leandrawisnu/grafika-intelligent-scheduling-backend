@@ -29,6 +29,21 @@ export const stagesValidation = [
   { duration: "10s", target: 0 },
 ];
 
+export const stagesResolver = [
+  { duration: "30s", target: 1 },
+  { duration: "2m", target: 3 },
+  { duration: "30s", target: 0 },
+];
+
+export const stagesPlotting = [
+  { duration: "30s", target: 3 },
+  { duration: "2m", target: 10 },
+  { duration: "30s", target: 0 },
+];
+
+// Rollover = operasi admin sekali per semester → benchmark 1 VU.
+export const stagesRollover = [{ duration: "1m", target: 1 }];
+
 /** Tags used by smoke / fe-smoke bootstrap batch. */
 export const smokeBootstrapTags = [
   "katalog",
@@ -86,5 +101,33 @@ export const thresholdsReadHeavy = {
 
 export const thresholdsValidation = {
   http_req_failed: ["rate<0.05"],
-  "http_req_duration{name:validasi}": ["p(95)<10000"],
+  http_req_duration: ["p(95)<10000"],
+  ...perEndpointThresholds(
+    ["validasi", "validasi_rearm"],
+    10000,
+    { validasi_rearm: 2000 }
+  ),
+};
+
+export const thresholdsResolver = {
+  http_req_failed: ["rate<0.05"],
+  http_req_duration: ["p(95)<2000"],
+  ...perEndpointThresholds(
+    ["konflik_list", "resolver_selesaikan", "resolver_resolusi", "resolver_terima"],
+    3000
+  ),
+};
+
+export const thresholdsPlotting = {
+  http_req_failed: ["rate<0.02"],
+  http_req_duration: ["p(95)<1000"],
+  ...perEndpointThresholds(
+    ["plotting_list", "plotting_create", "plotting_update", "plotting_delete"],
+    1500
+  ),
+};
+
+export const thresholdsRollover = {
+  http_req_failed: ["rate<0.01"],
+  ...perEndpointThresholds(["rollover_salin"], 15000),
 };

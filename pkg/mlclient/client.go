@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -116,4 +117,103 @@ func (c *Client) EkstrakJadwal(namaBerkas string, isi []byte, katalog KatalogEks
 		out.Baris = []BarisEkstrak{}
 	}
 	return out.Baris, nil
+}
+
+type DokumenParseHasil struct {
+	Markdown      string   `json:"markdown"`
+	Teks          string   `json:"teks"`
+	JumlahHalaman int      `json:"jumlah_halaman"`
+	Peringatan    []string `json:"peringatan"`
+}
+
+// ParseDokumen mengirim berkas format apa pun ke layanan ML untuk di-parse LlamaParse.
+// Timeout panjang karena dokumen besar bisa diproses puluhan detik sampai beberapa menit.
+func (c *Client) ParseDokumen(namaBerkas string, isi []byte) (*DokumenParseHasil, error) {
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	bagian, err := w.CreateFormFile("berkas", namaBerkas)
+	if err != nil {
+		return nil, fmt.Errorf("siapkan berkas ingest: %w", err)
+	}
+	if _, err := bagian.Write(isi); err != nil {
+		return nil, fmt.Errorf("tulis berkas ingest: %w", err)
+	}
+	if err := w.Close(); err != nil {
+		return nil, fmt.Errorf("tutup berkas ingest: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/ingest/parse", &buf)
+	if err != nil {
+		return nil, fmt.Errorf("permintaan ingest: %w", err)
+	}
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	klien := &http.Client{Timeout: 360 * time.Second}
+	resp, err := klien.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ml service call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 800))
+		return nil, fmt.Errorf("ml service error %d: %s", resp.StatusCode, pesanML(bodyBytes))
+	}
+
+	var out DokumenParseHasil
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, fmt.Errorf("decode ml response: %w", err)
+	}
+	return &out, nil
+}
+
+// PetakanDokumen meminta LLM (via layanan ML) memetakan hasil parsing ke master GIS.
+func (c *Client) PetakanDokumen(teks string, konteks interface{}) (json.RawMessage, error) {
+	payload, err := json.Marshal(map[string]interface{}{"teks": teks, "konteks": konteks})
+	if err != nil {
+		return nil, fmt.Errorf("marshal request petakan: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, c.baseURL+"/ingest/petakan", bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("permintaan petakan: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	klien := &http.Client{Timeout: 240 * time.Second}
+	resp, err := klien.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("ml service call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 800))
+		return nil, fmt.Errorf("ml service error %d: %s", resp.StatusCode, pesanML(bodyBytes))
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	if err != nil {
+		return nil, fmt.Errorf("baca jawaban ml: %w", err)
+	}
+	if !json.Valid(body) {
+		return nil, fmt.Errorf("jawaban ml bukan JSON valid")
+	}
+	return json.RawMessage(body), nil
+}
+
+// pesanML mengambil pesan ramah dari body error layanan ML ({"detail": ...}).
+func pesanML(body []byte) string {
+	var v struct {
+		Detail string `json:"detail"`
+		Error  string `json:"error"`
+	}
+	if json.Unmarshal(body, &v) == nil {
+		if v.Detail != "" {
+			return v.Detail
+		}
+		if v.Error != "" {
+			return v.Error
+		}
+	}
+	return strings.TrimSpace(string(body))
 }

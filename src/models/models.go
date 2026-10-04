@@ -369,3 +369,26 @@ type MemoriChatbot struct {
 }
 
 func (MemoriChatbot) TableName() string { return "memori_chatbot" }
+
+// ---- AI Import Dokumen (job async) ----
+
+type DokumenImpor struct {
+	BaseModel
+	JadwalSemesterID  *uuid.UUID      `gorm:"type:uuid;column:jadwal_semester_id" json:"jadwal_semester_id,omitempty"`
+	JadwalSemester    *JadwalSemester `gorm:"foreignKey:JadwalSemesterID" json:"-"`
+	SemesterID        *uuid.UUID      `gorm:"type:uuid;column:semester_id" json:"semester_id,omitempty"`
+	Target            string          `gorm:"not null;default:otomatis;column:target;size:20" json:"target"`
+	NamaBerkas        string          `gorm:"not null;column:nama_berkas" json:"nama_berkas"`
+	KunciBerkas       string          `gorm:"not null;column:kunci_berkas" json:"kunci_berkas"`
+	MimeBerkas        string          `gorm:"column:mime_berkas;size:120" json:"mime_berkas"`
+	UkuranBerkas      int64           `gorm:"not null;default:0;column:ukuran_berkas" json:"ukuran_berkas"`
+	Status            string          `gorm:"not null;default:menunggu;column:status;size:20" json:"status"`
+	Tahap             string          `gorm:"not null;default:menunggu;column:tahap;size:30" json:"tahap"`
+	Pesan             *string         `gorm:"column:pesan" json:"pesan,omitempty"`
+	TeksMarkdown      *string         `gorm:"type:text;column:teks_markdown" json:"-"`
+	RencanaJSON       *string         `gorm:"type:jsonb;column:rencana_json" json:"rencana_json,omitempty"`
+	HasilTerapkanJSON *string         `gorm:"type:jsonb;column:hasil_terapkan_json" json:"hasil_terapkan_json,omitempty"`
+	DilakukanOleh     string          `gorm:"column:dilakukan_oleh;size:150" json:"dilakukan_oleh"`
+}
+
+func (DokumenImpor) TableName() string { return "dokumen_impor" }

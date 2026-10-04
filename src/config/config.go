@@ -30,6 +30,10 @@ type Config struct {
 	MinIOSecretKey string
 	MinIOBucket    string
 	MinIOUseSSL    bool
+	// RateLimit caps authenticated requests per user on heavy
+	// endpoints. 0 (or negative) disables the limiter.
+	RateLimit          int
+	RateLimitWindowSec int
 }
 
 func Load() *Config {
@@ -71,6 +75,8 @@ func Load() *Config {
 		MinIOSecretKey: getEnv("MINIO_SECRET_KEY", os.Getenv("MINIO_ROOT_PASSWORD")),
 		MinIOBucket:    getEnv("MINIO_BUCKET", "gis"),
 		MinIOUseSSL:    getEnvBool("MINIO_USE_SSL", false),
+		RateLimit:      getEnvInt("GIS_RATE_LIMIT", 60),
+		RateLimitWindowSec: getEnvInt("GIS_RATE_LIMIT_WINDOW_SEC", 60),
 	}
 	return cfg
 }
