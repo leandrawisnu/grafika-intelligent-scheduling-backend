@@ -28,7 +28,7 @@ Buat user/database di Postgres lokal sesuai `.env`, lalu:
 
 ```bash
 make migrate-init
-make seed-ganjil   # opsional: master + jadwal semester skeleton (Ganjil 2026/2027)
+make seed-demo   # opsional: data demo Ganjil 2026/2027 (master + jadwal + slot)
 make start
 curl -s http://127.0.0.1:8080/health
 ```
@@ -47,8 +47,7 @@ make db-up
 | `make start` | `go run ./src` (tanpa reload) |
 | `make air-install` | `go install` Air ke `$(go env GOPATH)/bin` |
 | `make migrate-init` / `migrate-up` / … | Migrasi |
-| `make seed-ganjil` | Data demo Ganjil 2026/2027 (skeleton, tanpa slot) |
-| `make seed-slots` | Mapel, guru, slot jadwal template (50 kelas) |
+| `make seed-demo` | Data demo Ganjil 2026/2027 (master + jadwal + slot); `--skeleton-only` via `./scripts/seed-demo.sh --skeleton-only` |
 | `make db-up` / `db-down` | Postgres Docker saja (opsional) |
 
 ## Docker API (`web-api`)
@@ -60,7 +59,37 @@ docker compose up -d --build
 
 `DB_HOST=host.docker.internal` di container; port DB mengikuti `.env`.
 
+## Coolify (backend only)
+
+Polyrepo ini deploy ke Coolify per-folder — backend pakai `docker-compose.coolify.yaml`
+(isinya 3 service internal: `backend` + `postgres` + `minio`, tanpa
+`container_name`/`ports`, data persisten di volume `gis_pgdata`/`gis_minio`).
+
+1. Coolify → New Resource → Docker Compose → pilih repo + branch.
+2. Base Directory arahkan ke `grafika-intelligent-scheduling-backend/`,
+   Compose file: `docker-compose.coolify.yaml`.
+3. Environment Variables: copy dari `.env.coolify.example`
+   (wajib: `DB_PASSWORD`, `MINIO_ROOT_PASSWORD`).
+4. Domain → service `backend`, port `8080`. Cek via `/health`.
+5. Deploy — migrasi jalan otomatis via `docker-entrypoint.sh`,
+   bucket MinIO dibuat otomatis oleh backend.
+   Set `GIS_SKIP_MIGRATE=true` untuk skip bila perlu.
+
 ## API
 
 - `GET /health`
 - `/api/v1` — [`src/router/router.go`](src/router/router.go)
+
+## Stress test (k6)
+
+Skrip load test ada di [`stress-test/`](stress-test/). Dua mode: API direct (`smoke`, `bootstrap`, …) dan FE end-to-end lewat Next.js proxy (`fe-smoke`, `fe-bootstrap`, …).
+
+```bash
+cd stress-test
+cp .env.example .env   # K6_BASE_URL, K6_USER, K6_PASSWORD
+chmod +x scripts/run.sh
+./scripts/run.sh smoke
+./scripts/run.sh fe-smoke   # butuh frontend jalan di :3000 atau domain
+```
+
+Detail skenario, threshold, dan slow-query analysis: [`stress-test/README.md`](stress-test/README.md).
