@@ -324,35 +324,57 @@ func (s *LayananJadwal) AmbilKetersediaanGuru(jsID uuid.UUID) ([]map[string]inte
 		jkIDs[i] = jk.ID
 	}
 
+	// Satu query: jumlah slot per guru (ganti loop COUNT per guru).
+	jumlahSlot := make(map[uuid.UUID]int64, len(guru))
+	if len(jkIDs) > 0 {
+		var baris []struct {
+			GuruID uuid.UUID
+			Jumlah int64
+		}
+		s.db.Model(&models.SlotJadwal{}).
+			Select("guru_id, COUNT(*) AS jumlah").
+			Where("jadwal_kelas_id IN ? AND guru_id IS NOT NULL", jkIDs).
+			Group("guru_id").
+			Find(&baris)
+		for _, b := range baris {
+			jumlahSlot[b.GuruID] = b.Jumlah
+		}
+	}
+
+	// Satu query: semester target.
+	var semesterID uuid.UUID
+	var js models.JadwalSemester
+	if err := s.db.Select("semester_id").First(&js, "id = ?", jsID).Error; err == nil {
+		semesterID = js.SemesterID
+	}
+
+	// Satu query: hari libur per guru (ganti loop pluck per guru).
+	liburPerGuru := make(map[uuid.UUID][]string, len(guru))
+	q := s.db.Model(&models.HariLiburGuru{}).
+		Select("hari_libur_guru.guru_id, h.nama").
+		Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id")
+	if semesterID != uuid.Nil {
+		q = q.Where("hari_libur_guru.semester_id = ?", semesterID)
+	}
+	var libur []struct {
+		GuruID uuid.UUID
+		Nama   string
+	}
+	if err := q.Find(&libur).Error; err == nil {
+		for _, b := range libur {
+			liburPerGuru[b.GuruID] = append(liburPerGuru[b.GuruID], b.Nama)
+		}
+	}
+
 	hasil := make([]map[string]interface{}, 0, len(guru))
 	for _, g := range guru {
-		var jumlahSlot int64
-		if len(jkIDs) > 0 {
-			s.db.Model(&models.SlotJadwal{}).
-				Where("jadwal_kelas_id IN ? AND guru_id = ?", jkIDs, g.ID).Count(&jumlahSlot)
-		}
-
-		var hariLibur []string
-		var js models.JadwalSemester
-		if err := s.db.Select("semester_id").First(&js, "id = ?", jsID).Error; err == nil {
-			s.db.Model(&models.HariLiburGuru{}).Select("h.nama").
-				Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
-				Where("hari_libur_guru.guru_id = ? AND hari_libur_guru.semester_id = ?", g.ID, js.SemesterID).
-				Pluck("h.nama", &hariLibur)
-		} else {
-			s.db.Model(&models.HariLiburGuru{}).Select("h.nama").
-				Joins("JOIN hari h ON h.id = hari_libur_guru.hari_id").
-				Where("hari_libur_guru.guru_id = ?", g.ID).
-				Pluck("h.nama", &hariLibur)
-		}
-
 		hasil = append(hasil, map[string]interface{}{
 			"id":                      g.ID,
 			"nama":                    g.NamaLengkap,
 			"nip":                     g.NIP,
-			"jumlah_slot_ditugaskan":  jumlahSlot,
+			"jumlah_slot_ditugaskan":  jumlahSlot[g.ID],
 			"jam_maksimal_per_minggu": g.JamMaksimalPerMinggu,
-			"hari_libur":              hariLibur,
+			"hari_libur":              liburPerGuru[g.ID],
 		})
 	}
 	return hasil, nil
